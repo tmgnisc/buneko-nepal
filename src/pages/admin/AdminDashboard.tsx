@@ -44,85 +44,218 @@ const sidebarLinks = [
 ];
 
 // Dashboard Overview
-const AdminOverview = () => (
-  <div className="space-y-6">
-    <div>
-      <h1 className="font-serif text-3xl font-bold text-foreground">
-        Admin Dashboard
-      </h1>
-      <p className="text-muted-foreground mt-1">
-        Manage your store, products, and orders.
-      </p>
-    </div>
+const AdminOverview = () => {
+  const navigate = useNavigate();
+  const [stats, setStats] = useState({
+    totalProducts: 0,
+    totalOrders: 0,
+    totalCustomers: 0,
+    totalRevenue: 0,
+    recentOrders: [],
+  });
+  const [loading, setLoading] = useState(true);
 
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {[
-        { label: 'Total Products', value: '48', icon: Package, trend: '+12%' },
-        { label: 'Total Orders', value: '156', icon: ShoppingCart, trend: '+8%' },
-        { label: 'Total Customers', value: '89', icon: Users, trend: '+15%' },
-        { label: 'Revenue', value: 'NPR 2.4M', icon: TrendingUp, trend: '+23%' },
-      ].map((stat) => (
-        <div key={stat.label} className="bg-card rounded-2xl p-6 shadow-soft">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">{stat.label}</p>
-              <p className="text-2xl font-bold text-foreground mt-1">{stat.value}</p>
-              <span className="text-xs text-accent font-medium">{stat.trend}</span>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <stat.icon className="h-6 w-6 text-primary" />
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        setLoading(true);
+        const res = await api.getDashboardStats();
+        if (res.success && res.data) {
+          setStats(res.data);
+        }
+      } catch (error: any) {
+        console.error('Error loading dashboard stats:', error);
+        toast.error(error.message || 'Failed to load dashboard statistics');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadStats();
+  }, []);
 
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="bg-card rounded-2xl p-6 shadow-soft">
-        <h2 className="font-serif text-xl font-semibold text-foreground mb-4">
-          Recent Orders
-        </h2>
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="flex items-center justify-between py-3 border-b border-border last:border-0">
-              <div>
-                <p className="font-medium text-foreground">Order #100{i}</p>
-                <p className="text-sm text-muted-foreground">Rose Bouquet × 2</p>
+  const formatRevenue = (amount: number) => {
+    if (amount >= 1000000) {
+      return `NPR ${(amount / 1000000).toFixed(2)}M`;
+    } else if (amount >= 1000) {
+      return `NPR ${(amount / 1000).toFixed(2)}K`;
+    }
+    return `NPR ${amount.toFixed(2)}`;
+  };
+
+  const formatAmount = (value: any) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? `NPR ${n.toFixed(2)}` : `NPR ${value}`;
+  };
+
+  const formatDate = (value: string) =>
+    value ? new Date(value).toLocaleDateString() : '';
+
+  const statsCards = [
+    {
+      label: 'Total Products',
+      value: stats.totalProducts.toString(),
+      icon: Package,
+    },
+    {
+      label: 'Total Orders',
+      value: stats.totalOrders.toString(),
+      icon: ShoppingCart,
+    },
+    {
+      label: 'Total Customers',
+      value: stats.totalCustomers.toString(),
+      icon: Users,
+    },
+    {
+      label: 'Revenue',
+      value: formatRevenue(stats.totalRevenue),
+      icon: TrendingUp,
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-serif text-3xl font-bold text-foreground">
+          Admin Dashboard
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Manage your store, products, and orders.
+        </p>
+      </div>
+
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-card rounded-2xl p-6 shadow-soft">
+              <div className="animate-pulse">
+                <div className="h-4 bg-muted rounded w-24 mb-2"></div>
+                <div className="h-8 bg-muted rounded w-16 mb-2"></div>
               </div>
-              <span className="px-3 py-1 rounded-full text-xs font-medium bg-accent/10 text-accent">
-                Processing
-              </span>
             </div>
           ))}
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {statsCards.map((stat) => (
+            <div key={stat.label} className="bg-card rounded-2xl p-6 shadow-soft">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">{stat.label}</p>
+                  <p className="text-2xl font-bold text-foreground mt-1">
+                    {stat.value}
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <stat.icon className="h-6 w-6 text-primary" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
-      <div className="bg-card rounded-2xl p-6 shadow-soft">
-        <h2 className="font-serif text-xl font-semibold text-foreground mb-4">
-          Quick Actions
-        </h2>
-        <div className="grid grid-cols-2 gap-4">
-          <Button variant="outline" className="h-auto py-4 flex-col gap-2">
-            <Plus className="h-5 w-5" />
-            Add Product
-          </Button>
-          <Button variant="outline" className="h-auto py-4 flex-col gap-2">
-            <ShoppingCart className="h-5 w-5" />
-            View Orders
-          </Button>
-          <Button variant="outline" className="h-auto py-4 flex-col gap-2">
-            <Users className="h-5 w-5" />
-            Customers
-          </Button>
-          <Button variant="outline" className="h-auto py-4 flex-col gap-2">
-            <FileEdit className="h-5 w-5" />
-            Edit Content
-          </Button>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-card rounded-2xl p-6 shadow-soft">
+          <h2 className="font-serif text-xl font-semibold text-foreground mb-4">
+            Recent Orders
+          </h2>
+          {loading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="h-4 bg-muted rounded w-32 mb-2"></div>
+                  <div className="h-3 bg-muted rounded w-24"></div>
+                </div>
+              ))}
+            </div>
+          ) : stats.recentOrders.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No orders yet.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {stats.recentOrders.map((order: any) => (
+                <div
+                  key={order.id}
+                  className="flex items-center justify-between py-3 border-b border-border last:border-0 cursor-pointer hover:bg-secondary/50 rounded-lg px-2 transition-colors"
+                  onClick={() => navigate(`/admin/orders/${order.id}`)}
+                >
+                  <div>
+                    <p className="font-medium text-foreground">
+                      Order #{order.id}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {order.user_name} • {formatAmount(order.total_amount)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formatDate(order.created_at)}
+                    </p>
+                  </div>
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
+                      order.status === 'delivered'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : order.status === 'cancelled'
+                        ? 'bg-destructive/10 text-destructive'
+                        : order.status === 'processing'
+                        ? 'bg-sky-100 text-sky-700'
+                        : order.status === 'shipped'
+                        ? 'bg-indigo-100 text-indigo-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }`}
+                  >
+                    {order.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-card rounded-2xl p-6 shadow-soft">
+          <h2 className="font-serif text-xl font-semibold text-foreground mb-4">
+            Quick Actions
+          </h2>
+          <div className="grid grid-cols-2 gap-4">
+            <Button
+              variant="outline"
+              className="h-auto py-4 flex-col gap-2"
+              onClick={() => navigate('/admin/products')}
+            >
+              <Plus className="h-5 w-5" />
+              Add Product
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto py-4 flex-col gap-2"
+              onClick={() => navigate('/admin/orders')}
+            >
+              <ShoppingCart className="h-5 w-5" />
+              View Orders
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto py-4 flex-col gap-2"
+              onClick={() => navigate('/admin/customers')}
+            >
+              <Users className="h-5 w-5" />
+              Customers
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto py-4 flex-col gap-2"
+              onClick={() => navigate('/admin/content')}
+            >
+              <FileEdit className="h-5 w-5" />
+              Edit Content
+            </Button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 
 // Orders Management (dynamic)

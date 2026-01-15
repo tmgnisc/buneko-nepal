@@ -511,6 +511,19 @@ class ApiClient {
       body: JSON.stringify({ is_active: isActive }),
     });
   }
+
+  // Dashboard endpoints
+  async getDashboardStats() {
+    return this.request<{
+      totalProducts: number;
+      totalOrders: number;
+      totalCustomers: number;
+      totalRevenue: number;
+      recentOrders: any[];
+    }>('/dashboard/stats', {
+      method: 'GET',
+    });
+  }
 }
 
 export const api = new ApiClient();

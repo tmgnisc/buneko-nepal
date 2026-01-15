@@ -15,6 +15,7 @@ import categoryRoutes from './routes/category.routes.js';
 import contentRoutes from './routes/content.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import wishlistRoutes from './routes/wishlist.routes.js';
+import dashboardRoutes from './routes/dashboard.routes.js';
 
 // Import database connection
 import { testConnection } from './config/database.js';
@@ -70,6 +71,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/contents', contentRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/wishlist', wishlistRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
