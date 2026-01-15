@@ -52,7 +52,9 @@ class ApiClient {
             window.location.href = '/login';
           }
         }
-        throw new Error(data.message || data.error || 'Request failed');
+        // Provide more detailed error message
+        const errorMessage = data.message || data.error || `Request failed with status ${response.status}`;
+        throw new Error(errorMessage);
       }
 
       return data;
@@ -116,6 +118,97 @@ class ApiClient {
   async getProductById(id: number) {
     return this.request<{ product: any }>(`/products/${id}`, {
       method: 'GET',
+    });
+  }
+
+  async createProduct(productData: {
+    name: string;
+    description: string;
+    price: number;
+    category_id: number;
+    stock?: number;
+    image?: File;
+  }) {
+    const formData = new FormData();
+    formData.append('name', productData.name);
+    formData.append('description', productData.description);
+    formData.append('price', productData.price.toString());
+    formData.append('category_id', productData.category_id.toString());
+    if (productData.stock !== undefined) {
+      formData.append('stock', productData.stock.toString());
+    }
+    if (productData.image) {
+      formData.append('image', productData.image);
+    }
+
+    const token = this.getAuthToken();
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/products`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to create product');
+    }
+
+    return data;
+  }
+
+  async updateProduct(id: number, productData: {
+    name: string;
+    description: string;
+    price: number;
+    category_id: number;
+    stock?: number;
+    image?: File;
+    image_url?: string;
+  }) {
+    const formData = new FormData();
+    formData.append('name', productData.name);
+    formData.append('description', productData.description);
+    formData.append('price', productData.price.toString());
+    formData.append('category_id', productData.category_id.toString());
+    if (productData.stock !== undefined) {
+      formData.append('stock', productData.stock.toString());
+    }
+    if (productData.image) {
+      formData.append('image', productData.image);
+    } else if (productData.image_url) {
+      formData.append('image_url', productData.image_url);
+    }
+
+    const token = this.getAuthToken();
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/products/${id}`, {
+      method: 'PUT',
+      headers,
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to update product');
+    }
+
+    return data;
+  }
+
+  async deleteProduct(id: number) {
+    return this.request(`/products/${id}`, {
+      method: 'DELETE',
     });
   }
 

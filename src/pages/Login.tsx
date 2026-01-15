@@ -4,7 +4,6 @@ import { Flower2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,7 +14,6 @@ import { toast } from 'sonner';
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  rememberMe: z.boolean().optional(),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -31,13 +29,15 @@ const Login = () => {
     formState: { errors, isSubmitting },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    mode: 'onSubmit',
   });
 
   const onSubmit = async (data: LoginFormData) => {
+    console.log('✅ Form submitted with data:', data);
     try {
-      console.log('Attempting login with:', data.email);
+      console.log('🔄 Attempting login with:', data.email);
       const userData = await login(data.email, data.password);
-      console.log('Login successful, user data:', userData);
+      console.log('✅ Login successful, user data:', userData);
       
       toast.success(`Welcome back, ${userData.name}!`);
       
@@ -51,9 +51,13 @@ const Login = () => {
         }
       }, 100);
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
       toast.error(error.message || 'Invalid credentials. Please try again.');
     }
+  };
+
+  const onError = (errors: any) => {
+    console.log('❌ Form validation errors:', errors);
   };
 
   return (
@@ -82,11 +86,9 @@ const Login = () => {
           </p>
 
           <form 
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSubmit(onSubmit)(e);
-            }} 
+            onSubmit={handleSubmit(onSubmit, onError)}
             className="space-y-6"
+            noValidate
           >
             <div>
               <Label htmlFor="email">Email Address</Label>
@@ -137,13 +139,7 @@ const Login = () => {
               )}
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Checkbox id="rememberMe" {...register('rememberMe')} />
-                <Label htmlFor="rememberMe" className="text-sm cursor-pointer">
-                  Remember me
-                </Label>
-              </div>
+            <div className="flex items-center justify-end">
               <Link
                 to="/forgot-password"
                 className="text-sm text-primary hover:underline"

@@ -37,11 +37,13 @@ const Signup = () => {
     formState: { errors, isSubmitting },
   } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
+    mode: 'onSubmit',
   });
 
   const onSubmit = async (data: SignupFormData) => {
+    console.log('✅ Form submitted with data:', data);
     try {
-      console.log('Attempting signup with:', data.email);
+      console.log('🔄 Attempting signup with:', data.email);
       await signup(data.name, data.email, data.password);
       toast.success('Account created successfully!');
       
@@ -50,10 +52,15 @@ const Signup = () => {
         navigate('/dashboard', { replace: true });
       }, 100);
     } catch (error: any) {
-      console.error('Signup error:', error);
+      console.error('❌ Signup error:', error);
       toast.error(error.message || 'Something went wrong. Please try again.');
     }
   };
+
+  const onError = (errors: any) => {
+    console.log('❌ Form validation errors:', errors);
+  };
+
 
   return (
     <div className="min-h-screen flex">
@@ -102,11 +109,9 @@ const Signup = () => {
           </p>
 
           <form 
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSubmit(onSubmit)(e);
-            }} 
+            onSubmit={handleSubmit(onSubmit, onError)}
             className="space-y-6"
+            noValidate
           >
             <div>
               <Label htmlFor="name">Full Name</Label>

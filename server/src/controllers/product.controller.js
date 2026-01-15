@@ -1,4 +1,5 @@
-import { query } from '../config/database.js';
+import { query, getConnection } from '../config/database.js';
+import { deleteImage, extractPublicId } from '../utils/cloudinary.js';
 
 // Get all products
 export const getProducts = async (req, res) => {
@@ -84,7 +85,7 @@ export const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [products] = await query(
+    const products = await query(
       `SELECT 
         p.id,
         p.name,
@@ -102,7 +103,7 @@ export const getProductById = async (req, res) => {
       [id]
     );
 
-    if (products.length === 0) {
+    if (!Array.isArray(products) || products.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Product not found',
@@ -131,7 +132,7 @@ export const getProductsByCategory = async (req, res) => {
     const { page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
-    const [products] = await query(
+    const products = await query(
       `SELECT 
         p.id,
         p.name,
@@ -170,29 +171,69 @@ export const createProduct = async (req, res) => {
   try {
     const { name, description, price, category_id, stock, image_url } = req.body;
 
-    const [result] = await query(
-      `INSERT INTO products (name, description, price, category_id, stock, image_url)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [name, description, price, category_id, stock || 0, image_url || null]
-    );
+    // Validate required fields
+    if (!name || !description || !price || !category_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name, description, price, and category are required',
+      });
+    }
 
-    const [products] = await query(
-      'SELECT * FROM products WHERE id = ?',
-      [result.insertId]
-    );
+    // Use connection for INSERT to get insertId properly
+    const connection = await getConnection();
+    try {
+      const [result] = await connection.execute(
+        `INSERT INTO products (name, description, price, category_id, stock, image_url)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [name, description, parseFloat(price), parseInt(category_id), parseInt(stock) || 0, image_url || null]
+      );
 
-    res.status(201).json({
-      success: true,
-      message: 'Product created successfully',
-      data: {
-        product: products[0],
-      },
-    });
+      const userId = result.insertId;
+
+      // Get created product
+      const products = await query(
+        `SELECT 
+          p.id,
+          p.name,
+          p.description,
+          p.price,
+          p.image_url,
+          p.stock,
+          p.category_id,
+          c.name as category_name,
+          p.created_at,
+          p.updated_at
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE p.id = ?`,
+        [userId]
+      );
+
+      connection.release();
+
+      const product = Array.isArray(products) && products.length > 0 ? products[0] : null;
+
+      if (!product) {
+        throw new Error('Failed to retrieve created product');
+      }
+
+      res.status(201).json({
+        success: true,
+        message: 'Product created successfully',
+        data: {
+          product,
+        },
+      });
+    } catch (error) {
+      connection.release();
+      throw error;
+    }
   } catch (error) {
     console.error('Create product error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error creating product',
+      message: error.message || 'Error creating product',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 };
@@ -203,17 +244,28 @@ export const updateProduct = async (req, res) => {
     const { id } = req.params;
     const { name, description, price, category_id, stock, image_url } = req.body;
 
-    // Check if product exists
-    const [existingProducts] = await query(
-      'SELECT id FROM products WHERE id = ?',
+    // Check if product exists and get current image
+    const existingProducts = await query(
+      'SELECT id, image_url FROM products WHERE id = ?',
       [id]
     );
 
-    if (existingProducts.length === 0) {
+    if (!Array.isArray(existingProducts) || existingProducts.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Product not found',
       });
+    }
+
+    const existingProduct = existingProducts[0];
+    const oldImageUrl = existingProduct.image_url;
+
+    // If new image is uploaded and old image exists, delete old image from Cloudinary
+    if (image_url && oldImageUrl && image_url !== oldImageUrl) {
+      const oldPublicId = extractPublicId(oldImageUrl);
+      if (oldPublicId) {
+        await deleteImage(oldPublicId);
+      }
     }
 
     await query(
@@ -221,23 +273,42 @@ export const updateProduct = async (req, res) => {
        SET name = ?, description = ?, price = ?, category_id = ?, 
            stock = ?, image_url = ?, updated_at = NOW()
        WHERE id = ?`,
-      [name, description, price, category_id, stock, image_url, id]
+      [name, description, parseFloat(price), parseInt(category_id), parseInt(stock) || 0, image_url || null, id]
     );
 
-    const [products] = await query('SELECT * FROM products WHERE id = ?', [id]);
+    const products = await query(
+      `SELECT 
+        p.id,
+        p.name,
+        p.description,
+        p.price,
+        p.image_url,
+        p.stock,
+        p.category_id,
+        c.name as category_name,
+        p.created_at,
+        p.updated_at
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE p.id = ?`,
+      [id]
+    );
+
+    const product = Array.isArray(products) && products.length > 0 ? products[0] : null;
 
     res.json({
       success: true,
       message: 'Product updated successfully',
       data: {
-        product: products[0],
+        product,
       },
     });
   } catch (error) {
     console.error('Update product error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error updating product',
+      message: error.message || 'Error updating product',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 };
@@ -247,19 +318,30 @@ export const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check if product exists
-    const [existingProducts] = await query(
-      'SELECT id FROM products WHERE id = ?',
+    // Check if product exists and get image URL
+    const existingProducts = await query(
+      'SELECT id, image_url FROM products WHERE id = ?',
       [id]
     );
 
-    if (existingProducts.length === 0) {
+    if (!Array.isArray(existingProducts) || existingProducts.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Product not found',
       });
     }
 
+    const existingProduct = existingProducts[0];
+
+    // Delete image from Cloudinary if exists
+    if (existingProduct.image_url) {
+      const publicId = extractPublicId(existingProduct.image_url);
+      if (publicId) {
+        await deleteImage(publicId);
+      }
+    }
+
+    // Delete product from database
     await query('DELETE FROM products WHERE id = ?', [id]);
 
     res.json({
@@ -270,7 +352,8 @@ export const deleteProduct = async (req, res) => {
     console.error('Delete product error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error deleting product',
+      message: error.message || 'Error deleting product',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 };

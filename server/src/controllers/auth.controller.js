@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { query } from '../config/database.js';
+import { query, getConnection } from '../config/database.js';
 
 // Generate JWT token
 const generateToken = (userId, email, role) => {
@@ -16,13 +16,21 @@ export const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
+    // Validate input
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name, email, and password are required',
+      });
+    }
+
     // Check if user already exists
-    const [existingUsers] = await query(
+    const existingUsers = await query(
       'SELECT id FROM users WHERE email = ?',
       [email]
     );
 
-    if (existingUsers.length > 0) {
+    if (Array.isArray(existingUsers) && existingUsers.length > 0) {
       return res.status(400).json({
         success: false,
         message: 'User with this email already exists',
@@ -33,52 +41,81 @@ export const register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user (always as customer - admin/superadmin must be created manually)
-    const [result] = await query(
-      `INSERT INTO users (name, email, password, role) 
-       VALUES (?, ?, ?, 'customer')`,
-      [name, email, hashedPassword]
-    );
+    // Use getConnection for INSERT to get insertId properly
+    const connection = await getConnection();
+    try {
+      const [result] = await connection.execute(
+        `INSERT INTO users (name, email, password, role) 
+         VALUES (?, ?, ?, 'customer')`,
+        [name, email, hashedPassword]
+      );
 
-    const userId = result.insertId;
+      const userId = result.insertId;
 
-    // Generate token
-    const token = generateToken(userId, email, 'customer');
+      if (!userId) {
+        throw new Error('Failed to get user ID after registration');
+      }
 
-    // Get user data
-    const [users] = await query(
-      'SELECT id, name, email, role, created_at FROM users WHERE id = ?',
-      [userId]
-    );
+      // Generate token
+      const token = generateToken(userId, email, 'customer');
 
-    res.status(201).json({
-      success: true,
-      message: 'User registered successfully',
-      data: {
-        user: users[0],
-        token,
-      },
-    });
+      // Get user data
+      const users = await query(
+        'SELECT id, name, email, role, created_at FROM users WHERE id = ?',
+        [userId]
+      );
+
+      const userData = Array.isArray(users) && users.length > 0 ? users[0] : null;
+
+      if (!userData) {
+        throw new Error('Failed to retrieve user data after registration');
+      }
+
+      connection.release();
+
+      res.status(201).json({
+        success: true,
+        message: 'User registered successfully',
+        data: {
+          user: userData,
+          token,
+        },
+      });
+    } catch (error) {
+      connection.release();
+      throw error;
+    }
   } catch (error) {
     console.error('Register error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error registering user',
+      message: error.message || 'Error registering user',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 };
+
 
 // Login user (works for customer, admin, and superadmin)
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required',
+      });
+    }
+
     // Find user (including superadmin)
-    const [users] = await query(
+    const users = await query(
       'SELECT id, name, email, password, role FROM users WHERE email = ?',
       [email]
     );
 
-    if (users.length === 0) {
+    if (!Array.isArray(users) || users.length === 0) {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password',
@@ -120,7 +157,8 @@ export const login = async (req, res) => {
     console.error('Login error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error logging in',
+      message: error.message || 'Error logging in',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 };

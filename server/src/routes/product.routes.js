@@ -10,6 +10,7 @@ import {
 } from '../controllers/product.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { handleValidationErrors } from '../utils/validation.js';
+import { upload, uploadToCloudinary } from '../middleware/upload.middleware.js';
 
 const router = express.Router();
 
@@ -37,6 +38,10 @@ const productValidation = [
     .optional()
     .isInt({ min: 0 })
     .withMessage('Stock must be a non-negative integer'),
+  body('image_url')
+    .optional()
+    .isURL()
+    .withMessage('Image URL must be a valid URL'),
 ];
 
 // Routes
@@ -47,6 +52,8 @@ router.post(
   '/',
   authenticate,
   authorize('admin'),
+  upload.single('image'),
+  uploadToCloudinary,
   productValidation,
   handleValidationErrors,
   createProduct
@@ -55,6 +62,8 @@ router.put(
   '/:id',
   authenticate,
   authorize('admin'),
+  upload.single('image'),
+  uploadToCloudinary,
   productValidation,
   handleValidationErrors,
   updateProduct
