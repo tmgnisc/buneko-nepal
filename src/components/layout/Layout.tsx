@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { Navbar } from './Navbar';
 import { Footer } from './Footer';
+import WhatsAppButton from './WhatsAppButton';
 
 interface LayoutProps {
   children: ReactNode;
@@ -12,6 +13,7 @@ export const Layout = ({ children }: LayoutProps) => {
       <Navbar />
       <main className="flex-1 pt-20">{children}</main>
       <Footer />
+      <WhatsAppButton />
     </div>
   );
 };

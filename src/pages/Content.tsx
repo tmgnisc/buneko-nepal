@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlayCircle, RefreshCw } from 'lucide-react';
+import { PlayCircle, RefreshCw, ExternalLink } from 'lucide-react';
 
 interface ContentItem {
   id: number;
@@ -39,14 +39,175 @@ const ContentPage = () => {
     }
   };
 
+  // Load TikTok embed script once
+  useEffect(() => {
+    if (document.querySelector('script[src="https://www.tiktok.com/embed.js"]')) {
+      return; // Script already loaded
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://www.tiktok.com/embed.js';
+    script.async = true;
+    document.body.appendChild(script);
+
+    return () => {
+      // Cleanup on unmount
+      const existingScript = document.querySelector('script[src="https://www.tiktok.com/embed.js"]');
+      if (existingScript) {
+        existingScript.remove();
+      }
+    };
+  }, []);
+
   useEffect(() => {
     loadContents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
-  const getTikTokEmbedUrl = (url: string) => {
-    // Basic handling: if it's a TikTok share URL, just use it in an iframe
-    return url;
+  // Extract video ID from TikTok URL
+  const extractTikTokVideoId = (url: string): string | null => {
+    try {
+      // Handle different TikTok URL formats:
+      // https://www.tiktok.com/@username/video/1234567890
+      // https://vm.tiktok.com/xxxxx/ (short URL - needs to be resolved)
+      // https://www.tiktok.com/t/ZTxxxxx/
+      
+      const urlObj = new URL(url);
+      
+      // Check if it's a vm.tiktok.com short URL
+      if (urlObj.hostname.includes('vm.tiktok.com')) {
+        // For short URLs, we'll use the full URL in the embed
+        return null;
+      }
+      
+      // Extract from standard TikTok URL format: /@username/video/VIDEO_ID
+      const pathParts = urlObj.pathname.split('/');
+      const videoIndex = pathParts.indexOf('video');
+      if (videoIndex !== -1 && pathParts[videoIndex + 1]) {
+        return pathParts[videoIndex + 1];
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error parsing TikTok URL:', error);
+      return null;
+    }
+  };
+
+  // Component to render TikTok embed using official TikTok embed method
+  const TikTokEmbed = ({ url, title }: { url: string; title: string }) => {
+    const embedRef = useRef<HTMLDivElement>(null);
+    const loadingRef = useRef<HTMLDivElement>(null);
+    const videoId = extractTikTokVideoId(url);
+
+    useEffect(() => {
+      if (!embedRef.current) return;
+
+      // Clear previous content
+      embedRef.current.innerHTML = '';
+
+      // Create TikTok embed blockquote
+      const blockquote = document.createElement('blockquote');
+      blockquote.className = 'tiktok-embed';
+      blockquote.setAttribute('cite', url);
+      blockquote.style.maxWidth = '100%';
+      blockquote.style.minWidth = '325px';
+      blockquote.style.width = '100%';
+      blockquote.style.height = '100%';
+      
+      if (videoId) {
+        blockquote.setAttribute('data-video-id', videoId);
+      }
+
+      const section = document.createElement('section');
+      blockquote.appendChild(section);
+
+      embedRef.current.appendChild(blockquote);
+
+      // Function to render embed
+      const renderEmbed = () => {
+        if ((window as any).tiktokEmbed?.lib?.render && embedRef.current) {
+          (window as any).tiktokEmbed.lib.render(embedRef.current);
+          // Hide loading message after a short delay
+          setTimeout(() => {
+            if (loadingRef.current) {
+              loadingRef.current.style.display = 'none';
+            }
+          }, 1000);
+        }
+      };
+
+      // Render embed if TikTok script is already loaded
+      if ((window as any).tiktokEmbed?.lib?.render) {
+        renderEmbed();
+      } else {
+        // Wait for script to load
+        const checkScript = setInterval(() => {
+          if ((window as any).tiktokEmbed?.lib?.render) {
+            renderEmbed();
+            clearInterval(checkScript);
+          }
+        }, 100);
+
+        // Cleanup interval after 10 seconds
+        setTimeout(() => {
+          clearInterval(checkScript);
+          // If still loading after 10 seconds, hide loading message
+          if (loadingRef.current) {
+            loadingRef.current.style.display = 'none';
+          }
+        }, 10000);
+      }
+    }, [url, videoId]);
+
+    // Fallback for short URLs or if embed fails
+    if (!videoId) {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-black via-gray-900 to-black text-white p-6">
+          <div className="flex flex-col items-center justify-center flex-1">
+            <div className="relative mb-4">
+              <PlayCircle className="h-20 w-20 opacity-80" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-0 h-0 border-l-[12px] border-l-white border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent ml-1"></div>
+              </div>
+            </div>
+            <h3 className="font-semibold text-center mb-2 line-clamp-2 text-sm px-2">
+              {title}
+            </h3>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-4"
+              onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Watch on TikTok
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div 
+        className="w-full h-full bg-black overflow-hidden"
+        style={{ minHeight: '100%', position: 'relative' }}
+      >
+        {/* Loading state */}
+        <div 
+          ref={loadingRef}
+          className="absolute inset-0 flex items-center justify-center bg-black z-10"
+        >
+          <div className="text-white text-sm opacity-60">Loading TikTok video...</div>
+        </div>
+        {/* Embed container */}
+        <div 
+          ref={embedRef} 
+          className="w-full h-full"
+          style={{ minHeight: '100%' }}
+        />
+      </div>
+    );
   };
 
   return (
@@ -103,14 +264,8 @@ const ContentPage = () => {
                   key={item.id}
                   className="bg-card rounded-2xl shadow-soft overflow-hidden flex flex-col"
                 >
-                  <div className="relative w-full aspect-[9/16] bg-black">
-                    <iframe
-                      src={getTikTokEmbedUrl(item.url)}
-                      title={item.title}
-                      className="w-full h-full border-0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
+                  <div className="relative w-full aspect-[9/16] bg-black rounded-t-2xl overflow-hidden flex items-center justify-center">
+                    <TikTokEmbed url={item.url} title={item.title} />
                   </div>
                   <div className="p-4">
                     <h2 className="font-serif text-base font-semibold text-foreground line-clamp-2">

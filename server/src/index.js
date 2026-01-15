@@ -16,6 +16,7 @@ import contentRoutes from './routes/content.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import wishlistRoutes from './routes/wishlist.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
+import customizationRoutes from './routes/customization.routes.js';
 
 // Import database connection
 import { testConnection } from './config/database.js';
@@ -72,6 +73,7 @@ app.use('/api/contents', contentRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/customizations', customizationRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

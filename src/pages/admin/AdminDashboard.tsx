@@ -20,6 +20,7 @@ import {
   Plus,
   TrendingUp,
   Folder,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,6 +33,7 @@ import CategoriesManagement from './CategoriesManagement';
 import AdminProfile from './AdminProfile';
 import CustomersManagement from './CustomersManagement';
 import ContentManagement from './ContentManagement';
+import CustomizationsManagement from './CustomizationsManagement';
 
 const sidebarLinks = [
   { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
@@ -39,6 +41,7 @@ const sidebarLinks = [
   { name: 'Products', href: '/admin/products', icon: Package },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
   { name: 'Customers', href: '/admin/customers', icon: Users },
+  { name: 'Customizations', href: '/admin/customizations', icon: Sparkles },
   { name: 'Content', href: '/admin/content', icon: FileEdit },
   { name: 'Profile', href: '/admin/profile', icon: User },
 ];
@@ -1042,6 +1045,7 @@ const AdminDashboard = () => {
               <Route path="orders" element={<OrdersManagement />} />
               <Route path="orders/:id" element={<OrderDetails />} />
               <Route path="customers" element={<CustomersManagement />} />
+              <Route path="customizations" element={<CustomizationsManagement />} />
               <Route path="content" element={<ContentManagement />} />
               <Route path="profile" element={<AdminProfile />} />
             </Routes>

@@ -165,6 +165,30 @@ export const initializeTables = async () => {
           UNIQUE KEY unique_wishlist (user_id, product_id),
           INDEX idx_user (user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+      },
+      {
+        name: 'customizations',
+        sql: `CREATE TABLE IF NOT EXISTS customizations (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT NOT NULL,
+          title VARCHAR(200) NOT NULL,
+          description TEXT NOT NULL,
+          type ENUM('bouquet', 'flower', 'arrangement', 'other') DEFAULT 'bouquet',
+          occasion VARCHAR(100),
+          preferred_colors VARCHAR(255),
+          budget DECIMAL(10, 2),
+          delivery_date DATE,
+          special_requirements TEXT,
+          status ENUM('pending', 'reviewing', 'quoted', 'accepted', 'rejected', 'completed') DEFAULT 'pending',
+          admin_notes TEXT,
+          quoted_price DECIMAL(10, 2) NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
+          INDEX idx_user (user_id),
+          INDEX idx_status (status),
+          INDEX idx_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
       }
     ];
 
@@ -217,7 +241,7 @@ export const initializeTables = async () => {
         return t.TABLE_NAME || t.table_name || (typeof t === 'string' ? t : Object.values(t)[0]);
       });
       
-      const requiredTables = ['users', 'categories', 'products', 'orders', 'order_items', 'wishlist', 'contents'];
+      const requiredTables = ['users', 'categories', 'products', 'orders', 'order_items', 'wishlist', 'contents', 'customizations'];
       const missingTables = requiredTables.filter(t => !tableNames.includes(t));
 
       if (missingTables.length > 0) {

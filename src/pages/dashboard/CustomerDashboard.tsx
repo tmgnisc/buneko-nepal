@@ -18,6 +18,7 @@ import {
   Eye,
   EyeOff,
   Save,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,6 +40,7 @@ const sidebarLinks = [
   { name: 'Browse Products', href: '/dashboard/products', icon: ShoppingBag },
   { name: 'My Orders', href: '/dashboard/orders', icon: Package },
   { name: 'Wishlist', href: '/dashboard/wishlist', icon: Heart },
+  { name: 'Customization', href: '/dashboard/customization', icon: Sparkles },
   { name: 'Profile', href: '/dashboard/profile', icon: User },
 ];
 
@@ -373,6 +375,442 @@ const WishlistPage = () => {
 };
 
 // Profile Page
+// Customization Page Component
+const CustomizationPage = () => {
+  const [customizations, setCustomizations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    type: 'bouquet' as 'bouquet' | 'flower' | 'arrangement' | 'other',
+    occasion: '',
+    preferred_colors: '',
+    budget: '',
+    delivery_date: '',
+    special_requirements: '',
+  });
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  const loadCustomizations = async () => {
+    try {
+      setLoading(true);
+      const response = await api.getUserCustomizations({ page, limit: 10 });
+      if (response.success && response.data) {
+        setCustomizations(response.data.customizations || []);
+        if (response.data.pagination) {
+          setTotalPages(response.data.pagination.pages || 1);
+        }
+      }
+    } catch (error: any) {
+      console.error('Error loading customizations:', error);
+      toast.error(error.message || 'Failed to load customizations');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCustomizations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.title || !formData.description) {
+      toast.error('Title and description are required');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        ...formData,
+        budget: formData.budget ? parseFloat(formData.budget) : undefined,
+        delivery_date: formData.delivery_date || undefined,
+      };
+
+      const response = await api.createCustomization(payload);
+      if (response.success) {
+        toast.success('Customization request submitted successfully!');
+        setShowForm(false);
+        setFormData({
+          title: '',
+          description: '',
+          type: 'bouquet',
+          occasion: '',
+          preferred_colors: '',
+          budget: '',
+          delivery_date: '',
+          special_requirements: '',
+        });
+        loadCustomizations();
+      }
+    } catch (error: any) {
+      console.error('Error creating customization:', error);
+      toast.error(error.message || 'Failed to submit customization request');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusColors: Record<string, string> = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      reviewing: 'bg-blue-100 text-blue-800',
+      quoted: 'bg-purple-100 text-purple-800',
+      accepted: 'bg-green-100 text-green-800',
+      rejected: 'bg-red-100 text-red-800',
+      completed: 'bg-gray-100 text-gray-800',
+    };
+    return (
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${
+          statusColors[status] || statusColors.pending
+        }`}
+      >
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-serif text-3xl font-bold text-foreground">
+            Customization Requests
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Request custom flowers or bouquets tailored to your needs
+          </p>
+        </div>
+        <Button
+          onClick={() => setShowForm(!showForm)}
+          className="rounded-xl"
+        >
+          <Sparkles className="h-4 w-4 mr-2" />
+          {showForm ? 'Cancel' : 'New Request'}
+        </Button>
+      </div>
+
+      {/* Form */}
+      {showForm && (
+        <Card className="rounded-2xl shadow-soft">
+          <CardHeader>
+            <CardTitle>Create Customization Request</CardTitle>
+            <CardDescription>
+              Tell us about your custom flower or bouquet requirements
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="title">Title *</Label>
+                  <Input
+                    id="title"
+                    value={formData.title}
+                    onChange={(e) =>
+                      setFormData({ ...formData, title: e.target.value })
+                    }
+                    placeholder="e.g., Custom Wedding Bouquet"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="type">Type *</Label>
+                  <select
+                    id="type"
+                    value={formData.type}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        type: e.target.value as any,
+                      })
+                    }
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    required
+                  >
+                    <option value="bouquet">Bouquet</option>
+                    <option value="flower">Flower Arrangement</option>
+                    <option value="arrangement">Custom Arrangement</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="description">Description *</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                  placeholder="Describe what you're looking for in detail..."
+                  rows={4}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="occasion">Occasion</Label>
+                  <Input
+                    id="occasion"
+                    value={formData.occasion}
+                    onChange={(e) =>
+                      setFormData({ ...formData, occasion: e.target.value })
+                    }
+                    placeholder="e.g., Wedding, Birthday, Anniversary"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="preferred_colors">Preferred Colors</Label>
+                  <Input
+                    id="preferred_colors"
+                    value={formData.preferred_colors}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        preferred_colors: e.target.value,
+                      })
+                    }
+                    placeholder="e.g., Red, White, Pink"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="budget">Budget (NPR)</Label>
+                  <Input
+                    id="budget"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.budget}
+                    onChange={(e) =>
+                      setFormData({ ...formData, budget: e.target.value })
+                    }
+                    placeholder="e.g., 5000"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="delivery_date">Preferred Delivery Date</Label>
+                  <Input
+                    id="delivery_date"
+                    type="date"
+                    value={formData.delivery_date}
+                    onChange={(e) =>
+                      setFormData({ ...formData, delivery_date: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="special_requirements">Special Requirements</Label>
+                <Textarea
+                  id="special_requirements"
+                  value={formData.special_requirements}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      special_requirements: e.target.value,
+                    })
+                  }
+                  placeholder="Any additional requirements or notes..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowForm(false)}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? 'Submitting...' : 'Submit Request'}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Customizations List */}
+      {loading ? (
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <Card key={idx} className="rounded-2xl shadow-soft">
+              <CardContent className="p-6">
+                <div className="animate-pulse space-y-3">
+                  <div className="h-4 bg-muted rounded w-1/4"></div>
+                  <div className="h-4 bg-muted rounded w-full"></div>
+                  <div className="h-4 bg-muted rounded w-3/4"></div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : customizations.length === 0 ? (
+        <Card className="rounded-2xl shadow-soft">
+          <CardContent className="p-12 text-center">
+            <Sparkles className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-60" />
+            <p className="text-muted-foreground">
+              No customization requests yet. Create your first request!
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {customizations.map((customization) => (
+            <Card key={customization.id} className="rounded-2xl shadow-soft">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">{customization.title}</CardTitle>
+                    <CardDescription className="mt-1">
+                      {customization.type.charAt(0).toUpperCase() +
+                        customization.type.slice(1)}
+                      {customization.occasion && ` • ${customization.occasion}`}
+                    </CardDescription>
+                  </div>
+                  {getStatusBadge(customization.status)}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">
+                    {customization.description}
+                  </p>
+                </div>
+
+                {(customization.preferred_colors ||
+                  customization.budget ||
+                  customization.delivery_date ||
+                  customization.special_requirements) && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border">
+                    {customization.preferred_colors && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Colors</p>
+                        <p className="text-sm font-medium">
+                          {customization.preferred_colors}
+                        </p>
+                      </div>
+                    )}
+                    {customization.budget && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Budget</p>
+                        <p className="text-sm font-medium">
+                          NPR {parseFloat(customization.budget).toFixed(2)}
+                        </p>
+                      </div>
+                    )}
+                    {customization.delivery_date && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">
+                          Delivery Date
+                        </p>
+                        <p className="text-sm font-medium">
+                          {new Date(
+                            customization.delivery_date
+                          ).toLocaleDateString()}
+                        </p>
+                      </div>
+                    )}
+                    {customization.quoted_price && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">
+                          Quoted Price
+                        </p>
+                        <p className="text-sm font-medium text-primary">
+                          NPR {parseFloat(customization.quoted_price).toFixed(2)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {customization.special_requirements && (
+                  <div className="pt-2">
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Special Requirements
+                    </p>
+                    <p className="text-sm text-foreground whitespace-pre-wrap">
+                      {customization.special_requirements}
+                    </p>
+                  </div>
+                )}
+
+                {customization.admin_notes && (
+                  <div className="pt-2 border-t border-border">
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Admin Notes
+                    </p>
+                    <p className="text-sm text-foreground bg-secondary/50 p-3 rounded-lg whitespace-pre-wrap">
+                      {customization.admin_notes}
+                    </p>
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-border">
+                  <p className="text-xs text-muted-foreground">
+                    Submitted on{' '}
+                    {new Date(customization.created_at).toLocaleDateString(
+                      'en-US',
+                      {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      }
+                    )}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4">
+              <p className="text-sm text-muted-foreground">
+                Page {page} of {totalPages}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ProfilePage = () => {
   const { user, refreshUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -904,6 +1342,7 @@ const CustomerDashboard = () => {
               <Route path="products" element={<ProductsPage />} />
               <Route path="orders" element={<OrdersPage />} />
               <Route path="wishlist" element={<WishlistPage />} />
+              <Route path="customization" element={<CustomizationPage />} />
               <Route path="profile" element={<ProfilePage />} />
             </Routes>
           </motion.div>

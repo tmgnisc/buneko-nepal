@@ -524,6 +524,72 @@ class ApiClient {
       method: 'GET',
     });
   }
+
+  // Customization endpoints
+  async getUserCustomizations(params?: { page?: number; limit?: number }) {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+
+    const query = queryParams.toString();
+    return this.request<{ customizations: any[]; pagination: any }>(
+      `/customizations/my-customizations${query ? `?${query}` : ''}`,
+      { method: 'GET' }
+    );
+  }
+
+  async getAllCustomizations(params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.status) queryParams.append('status', params.status);
+
+    const query = queryParams.toString();
+    return this.request<{ customizations: any[]; pagination: any }>(
+      `/customizations${query ? `?${query}` : ''}`,
+      { method: 'GET' }
+    );
+  }
+
+  async getCustomizationById(id: number) {
+    return this.request<{ customization: any }>(`/customizations/${id}`, {
+      method: 'GET',
+    });
+  }
+
+  async createCustomization(data: {
+    title: string;
+    description: string;
+    type?: 'bouquet' | 'flower' | 'arrangement' | 'other';
+    occasion?: string;
+    preferred_colors?: string;
+    budget?: number;
+    delivery_date?: string;
+    special_requirements?: string;
+  }) {
+    return this.request<{ customization: any }>('/customizations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCustomizationStatus(
+    id: number,
+    data: {
+      status: 'pending' | 'reviewing' | 'quoted' | 'accepted' | 'rejected' | 'completed';
+      admin_notes?: string;
+      quoted_price?: number;
+    }
+  ) {
+    return this.request<{ customization: any }>(`/customizations/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 export const api = new ApiClient();

@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/* TikTok Embed Styles */
+.tiktok-embed {
+  margin: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 325px !important;
+}
+
+.tiktok-embed iframe {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+}
+
 @layer base {
   :root {
     /* Warm Beige Background */
