@@ -1,4 +1,5 @@
 import { query } from '../config/database.js';
+import { sendDeactivationEmail, sendActivationEmail } from '../utils/email.js';
 import bcrypt from 'bcryptjs';
 import { deleteImage, extractPublicId } from '../utils/cloudinary.js';
 
@@ -18,6 +19,7 @@ export const getUsers = async (req, res) => {
         phone,
         address,
         profile_image_url,
+        is_active,
         created_at,
         last_login
       FROM users
@@ -369,6 +371,93 @@ export const changePassword = async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message || 'Error changing password',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+    });
+  }
+};
+
+// Toggle user active status (admin/superadmin only)
+export const toggleUserStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { is_active } = req.body;
+
+    if (typeof is_active !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: 'is_active must be a boolean value',
+      });
+    }
+
+    // Check if user exists
+    const existingUsers = await query(
+      'SELECT id, role FROM users WHERE id = ?',
+      [id]
+    );
+
+    if (!Array.isArray(existingUsers) || existingUsers.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    const user = existingUsers[0];
+
+    // Prevent deactivating superadmin
+    if (user.role === 'superadmin' && !is_active) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot deactivate superadmin account',
+      });
+    }
+
+    // Get user details before updating (for email notification)
+    const userDetails = await query(
+      'SELECT id, name, email, role FROM users WHERE id = ?',
+      [id]
+    );
+    const userInfo = Array.isArray(userDetails) && userDetails.length > 0 ? userDetails[0] : null;
+
+    // Update is_active status
+    await query(
+      'UPDATE users SET is_active = ?, updated_at = NOW() WHERE id = ?',
+      [is_active, id]
+    );
+
+    const updatedUsers = await query(
+      'SELECT id, name, email, role, phone, address, profile_image_url, is_active, created_at FROM users WHERE id = ?',
+      [id]
+    );
+
+    const updatedUser = Array.isArray(updatedUsers) && updatedUsers.length > 0 ? updatedUsers[0] : null;
+
+    // Send email notification if user is a customer
+    if (userInfo && userInfo.role === 'customer') {
+      try {
+        if (is_active) {
+          await sendActivationEmail(userInfo);
+        } else {
+          await sendDeactivationEmail(userInfo);
+        }
+      } catch (emailError) {
+        console.error('Error sending email notification:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `User ${is_active ? 'activated' : 'deactivated'} successfully`,
+      data: {
+        user: updatedUser,
+      },
+    });
+  } catch (error) {
+    console.error('Toggle user status error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error updating user status',
       error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }

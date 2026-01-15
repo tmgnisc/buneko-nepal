@@ -65,11 +65,13 @@ export const initializeTables = async () => {
           phone VARCHAR(20),
           address TEXT,
           profile_image_url VARCHAR(255),
+          is_active BOOLEAN DEFAULT TRUE,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           last_login TIMESTAMP NULL,
           INDEX idx_email (email),
-          INDEX idx_role (role)
+          INDEX idx_role (role),
+          INDEX idx_is_active (is_active)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
       },
       {
@@ -233,6 +235,30 @@ export const initializeTables = async () => {
         // Column already exists, that's fine
       } else {
         console.warn('⚠️  Could not add profile_image_url column:', error.message);
+      }
+    }
+
+    // Add is_active column if it doesn't exist (for existing databases)
+    try {
+      const columns = await query(`
+        SELECT COLUMN_NAME 
+        FROM information_schema.COLUMNS 
+        WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'is_active'
+      `, [process.env.DB_NAME || 'EduConnect']);
+      
+      if (!Array.isArray(columns) || columns.length === 0) {
+        await query(`
+          ALTER TABLE users 
+          ADD COLUMN is_active BOOLEAN DEFAULT TRUE AFTER profile_image_url
+        `);
+        console.log('  ✓ Added is_active column to users table');
+      }
+    } catch (error) {
+      // Ignore if column already exists
+      if (error.code === 'ER_DUP_FIELDNAME' || error.message.includes('Duplicate column name')) {
+        // Column already exists, that's fine
+      } else {
+        console.warn('⚠️  Could not add is_active column:', error.message);
       }
     }
 

@@ -56,6 +56,13 @@ class ApiClient {
             }
           }
         }
+        // Handle 403 (Forbidden) - account deactivated
+        if (response.status === 403) {
+          const errorMessage = data.message || data.error || 'Your account has been deactivated. Please contact support for assistance.';
+          const error = new Error(errorMessage);
+          (error as any).status = 403;
+          throw error;
+        }
         // Provide more detailed error message
         const errorMessage = data.message || data.error || `Request failed with status ${response.status}`;
         throw new Error(errorMessage);
@@ -81,10 +88,18 @@ class ApiClient {
   }
 
   async login(email: string, password: string) {
-    return this.request<{ user: any; token: string }>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      return await this.request<{ user: any; token: string }>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+    } catch (error: any) {
+      // Handle 403 (Forbidden) specifically for inactive accounts
+      if (error.status === 403 || error.message?.includes('deactivated')) {
+        throw new Error(error.message || 'Your account has been deactivated. Please contact support for assistance.');
+      }
+      throw error;
+    }
   }
 
   async logout() {
@@ -391,6 +406,13 @@ class ApiClient {
   async deleteUser(id: number) {
     return this.request(`/users/${id}`, {
       method: 'DELETE',
+    });
+  }
+
+  async toggleUserStatus(id: number, isActive: boolean) {
+    return this.request<{ user: any }>(`/users/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_active: isActive }),
     });
   }
 }

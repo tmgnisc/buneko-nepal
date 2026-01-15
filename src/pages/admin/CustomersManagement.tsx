@@ -7,8 +7,8 @@ import {
   MapPin,
   Calendar,
   User as UserIcon,
-  Edit,
-  Trash2,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -20,26 +20,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -51,6 +31,7 @@ interface Customer {
   phone: string | null;
   address: string | null;
   profile_image_url: string | null;
+  is_active: boolean;
   created_at: string;
   last_login: string | null;
 }
@@ -58,46 +39,20 @@ interface Customer {
 const CustomersManagement = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [deleteCustomerId, setDeleteCustomerId] = useState<number | null>(null);
   const limit = 20;
 
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-  });
-
   useEffect(() => {
-    loadCustomers();
-  }, [page]);
-
-  // Debounce search - reset to page 1 when search changes
-  useEffect(() => {
-    if (searchTerm !== '') {
-      const timer = setTimeout(() => {
-        if (page !== 1) {
-          setPage(1);
-        } else {
-          loadCustomers();
-        }
-      }, 500);
-
-      return () => clearTimeout(timer);
-    } else if (page === 1) {
+    const timer = setTimeout(() => {
       loadCustomers();
-    } else {
-      setPage(1);
-    }
-  }, [searchTerm]);
+    }, searchTerm ? 500 : 0); // Debounce search, but load immediately when cleared
+
+    return () => clearTimeout(timer);
+  }, [page, searchTerm]);
 
   const loadCustomers = async () => {
     try {
@@ -116,7 +71,7 @@ const CustomersManagement = () => {
           customersList = customersList.filter((customer: Customer) =>
             customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (customer.phone && customer.phone.includes(searchTerm))
+            (customer.phone && customer.phone.toLowerCase().includes(searchTerm.toLowerCase()))
           );
         }
         
@@ -133,78 +88,20 @@ const CustomersManagement = () => {
     }
   };
 
-  const handleOpenDialog = (customer?: Customer) => {
-    if (customer) {
-      setSelectedCustomer(customer);
-      setFormData({
-        name: customer.name,
-        email: customer.email,
-        phone: customer.phone || '',
-        address: customer.address || '',
-      });
-    } else {
-      setSelectedCustomer(null);
-      setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        address: '',
-      });
-    }
-    setIsDialogOpen(true);
-  };
-
-  const handleCloseDialog = () => {
-    setIsDialogOpen(false);
-    setSelectedCustomer(null);
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      address: '',
-    });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCustomer) return;
-
-    setIsSubmitting(true);
+  const handleToggleStatus = async (customer: Customer) => {
+    setIsToggling(true);
+    setTogglingId(customer.id);
     try {
-      // Update user endpoint would go here
-      // For now, just show a message
-      toast.success('Customer updated successfully');
-      handleCloseDialog();
+      await api.toggleUserStatus(customer.id, !customer.is_active);
+      toast.success(`Customer ${!customer.is_active ? 'activated' : 'deactivated'} successfully`);
       loadCustomers();
     } catch (error: any) {
-      console.error('Error updating customer:', error);
-      toast.error(error.message || 'Failed to update customer');
+      console.error('Error toggling customer status:', error);
+      toast.error(error.message || 'Failed to update customer status');
     } finally {
-      setIsSubmitting(false);
+      setIsToggling(false);
+      setTogglingId(null);
     }
-  };
-
-  const handleDelete = async () => {
-    if (!deleteCustomerId) return;
-
-    setIsDeleting(true);
-    try {
-      await api.deleteUser(deleteCustomerId);
-      toast.success('Customer deleted successfully');
-      setIsDeleteDialogOpen(false);
-      setDeleteCustomerId(null);
-      loadCustomers();
-    } catch (error: any) {
-      console.error('Error deleting customer:', error);
-      toast.error(error.message || 'Failed to delete customer');
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const handleDeleteClick = (id: number) => {
-    setDeleteCustomerId(id);
-    setIsDeleteDialogOpen(true);
   };
 
   const formatDate = (dateString: string | null) => {
@@ -225,7 +122,7 @@ const CustomersManagement = () => {
             Manage Customers
           </h1>
           <p className="text-muted-foreground mt-1">
-            View and manage all registered customers
+            View and monitor all registered customers. Mark customers as inactive to restrict access.
           </p>
         </div>
       </div>
@@ -264,9 +161,10 @@ const CustomersManagement = () => {
                     <TableHead>Customer</TableHead>
                     <TableHead>Contact</TableHead>
                     <TableHead>Address</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead>Last Login</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -321,6 +219,21 @@ const CustomersManagement = () => {
                         )}
                       </TableCell>
                       <TableCell>
+                        <div className="flex items-center gap-2">
+                          {customer.is_active ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Active
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                              <XCircle className="h-3 w-3" />
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <div className="flex items-center gap-2 text-sm">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                           <span className="text-foreground">
@@ -334,20 +247,29 @@ const CustomersManagement = () => {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end">
                           <Button
-                            variant="outline"
+                            variant={customer.is_active ? "destructive" : "default"}
                             size="sm"
-                            onClick={() => handleOpenDialog(customer)}
+                            onClick={() => handleToggleStatus(customer)}
+                            disabled={isToggling && togglingId === customer.id}
                           >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDeleteClick(customer.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
+                            {isToggling && togglingId === customer.id ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                {customer.is_active ? 'Deactivating...' : 'Activating...'}
+                              </>
+                            ) : customer.is_active ? (
+                              <>
+                                <XCircle className="h-4 w-4 mr-2" />
+                                Mark Inactive
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="h-4 w-4 mr-2" />
+                                Mark Active
+                              </>
+                            )}
                           </Button>
                         </div>
                       </TableCell>
@@ -384,133 +306,8 @@ const CustomersManagement = () => {
           )}
         </>
       )}
-
-      {/* Edit Customer Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Edit Customer</DialogTitle>
-            <DialogDescription>
-              Update customer information
-            </DialogDescription>
-          </DialogHeader>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <Label htmlFor="name">Full Name</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                placeholder="Enter full name"
-                className="mt-2 rounded-xl"
-                required
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="email">Email Address</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                placeholder="Enter email"
-                className="mt-2 rounded-xl"
-                required
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input
-                id="phone"
-                type="tel"
-                value={formData.phone}
-                onChange={(e) =>
-                  setFormData({ ...formData, phone: e.target.value })
-                }
-                placeholder="Enter phone number"
-                className="mt-2 rounded-xl"
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="address">Address</Label>
-              <Textarea
-                id="address"
-                value={formData.address}
-                onChange={(e) =>
-                  setFormData({ ...formData, address: e.target.value })
-                }
-                placeholder="Enter address"
-                className="mt-2 rounded-xl min-h-[100px]"
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCloseDialog}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Updating...
-                  </>
-                ) : (
-                  'Update Customer'
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the customer account.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDelete} 
-              className="bg-destructive"
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
-                  Deleting...
-                </>
-              ) : (
-                'Delete'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };
 
 export default CustomersManagement;
-

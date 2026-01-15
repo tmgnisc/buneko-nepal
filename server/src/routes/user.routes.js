@@ -7,6 +7,7 @@ import {
   deleteUser,
   updateProfile,
   changePassword,
+  toggleUserStatus,
 } from '../controllers/user.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { handleValidationErrors } from '../utils/validation.js';
@@ -65,6 +66,7 @@ router.put(
   changePassword
 );
 router.put('/:id', authenticate, authorize('admin'), updateUserValidation, handleValidationErrors, updateUser);
+router.patch('/:id/status', authenticate, authorize('admin', 'superadmin'), toggleUserStatus);
 router.delete('/:id', authenticate, authorize('admin'), deleteUser);
 
 export default router;

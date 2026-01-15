@@ -111,7 +111,7 @@ export const login = async (req, res) => {
 
     // Find user (including superadmin)
     const users = await query(
-      'SELECT id, name, email, password, role FROM users WHERE email = ?',
+      'SELECT id, name, email, password, role, is_active FROM users WHERE email = ?',
       [email]
     );
 
@@ -123,6 +123,14 @@ export const login = async (req, res) => {
     }
 
     const user = users[0];
+
+    // Check if account is active
+    if (user.is_active === false || user.is_active === 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account has been deactivated. Please contact support for assistance.',
+      });
+    }
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
