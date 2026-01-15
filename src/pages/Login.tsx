@@ -23,7 +23,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, user } = useAuth();
 
   const {
     register,
@@ -35,17 +35,17 @@ const Login = () => {
 
   const onSubmit = async (data: LoginFormData) => {
     try {
-      await login(data.email, data.password);
+      const userData = await login(data.email, data.password);
       toast.success('Welcome back!');
       
-      // Redirect based on email (simulated role check)
-      if (data.email.includes('admin')) {
+      // Redirect based on user role
+      if (userData?.role === 'superadmin' || userData?.role === 'admin') {
         navigate('/admin');
       } else {
         navigate('/dashboard');
       }
-    } catch (error) {
-      toast.error('Invalid credentials. Please try again.');
+    } catch (error: any) {
+      toast.error(error.message || 'Invalid credentials. Please try again.');
     }
   };
 

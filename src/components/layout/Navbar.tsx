@@ -56,7 +56,7 @@ export const Navbar = () => {
           <div className="hidden md:flex items-center gap-4">
             {isAuthenticated ? (
               <>
-                <Link to={user?.role === 'admin' ? '/admin' : '/dashboard'}>
+                <Link to={user?.role === 'admin' || user?.role === 'superadmin' ? '/admin' : '/dashboard'}>
                   <Button variant="ghost" size="sm">
                     <User className="h-4 w-4 mr-2" />
                     Dashboard
@@ -123,7 +123,7 @@ export const Navbar = () => {
                 {isAuthenticated ? (
                   <>
                     <Link
-                      to={user?.role === 'admin' ? '/admin' : '/dashboard'}
+                      to={user?.role === 'admin' || user?.role === 'superadmin' ? '/admin' : '/dashboard'}
                       onClick={() => setIsOpen(false)}
                     >
                       <Button variant="outline" className="w-full">

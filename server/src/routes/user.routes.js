@@ -1,0 +1,43 @@
+import express from 'express';
+import { body } from 'express-validator';
+import {
+  getUsers,
+  getUserById,
+  updateUser,
+  deleteUser,
+  updateProfile,
+} from '../controllers/user.controller.js';
+import { authenticate, authorize } from '../middleware/auth.middleware.js';
+import { handleValidationErrors } from '../utils/validation.js';
+
+const router = express.Router();
+
+// User update validation
+const updateUserValidation = [
+  body('name')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Name must be between 2 and 50 characters'),
+  body('email')
+    .optional()
+    .trim()
+    .isEmail()
+    .withMessage('Please provide a valid email address')
+    .normalizeEmail(),
+  body('phone')
+    .optional()
+    .trim()
+    .matches(/^[0-9+\-\s()]+$/)
+    .withMessage('Please provide a valid phone number'),
+];
+
+// Routes
+router.get('/', authenticate, authorize('admin'), getUsers);
+router.get('/:id', authenticate, authorize('admin'), getUserById);
+router.put('/profile', authenticate, updateUserValidation, handleValidationErrors, updateProfile);
+router.put('/:id', authenticate, authorize('admin'), updateUserValidation, handleValidationErrors, updateUser);
+router.delete('/:id', authenticate, authorize('admin'), deleteUser);
+
+export default router;
+

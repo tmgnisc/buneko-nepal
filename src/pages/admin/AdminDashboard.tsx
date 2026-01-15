@@ -274,7 +274,7 @@ const AdminDashboard = () => {
             </button>
             <div className="flex items-center gap-4 ml-auto">
               <span className="text-sm text-muted-foreground">
-                Admin: {user?.name || 'Super Admin'}
+                {user?.role === 'superadmin' ? 'Super Admin' : 'Admin'}: {user?.name || 'Admin'}
               </span>
               <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
                 <User className="h-5 w-5 text-primary-foreground" />

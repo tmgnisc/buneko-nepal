@@ -44,8 +44,8 @@ const Signup = () => {
       await signup(data.name, data.email, data.password);
       toast.success('Account created successfully!');
       navigate('/dashboard');
-    } catch (error) {
-      toast.error('Something went wrong. Please try again.');
+    } catch (error: any) {
+      toast.error(error.message || 'Something went wrong. Please try again.');
     }
   };
 
