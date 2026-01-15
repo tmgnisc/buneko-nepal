@@ -2,11 +2,12 @@ import { query } from '../config/database.js';
 import bcrypt from 'bcryptjs';
 import { deleteImage, extractPublicId } from '../utils/cloudinary.js';
 
-// Get all users (admin only)
+// Get all users (admin only) or customers (for customer role)
 export const getUsers = async (req, res) => {
   try {
     const { page = 1, limit = 20, role } = req.query;
     const offset = (page - 1) * limit;
+    const userRole = req.user.role;
 
     let sql = `
       SELECT 
@@ -16,6 +17,7 @@ export const getUsers = async (req, res) => {
         role,
         phone,
         address,
+        profile_image_url,
         created_at,
         last_login
       FROM users
@@ -23,7 +25,12 @@ export const getUsers = async (req, res) => {
     `;
     const params = [];
 
-    if (role) {
+    // If customer, only show other customers (not admins)
+    if (userRole === 'customer') {
+      sql += ' AND role = ?';
+      params.push('customer');
+    } else if (role) {
+      // Admin can filter by role
       sql += ' AND role = ?';
       params.push(role);
     }
@@ -31,12 +38,35 @@ export const getUsers = async (req, res) => {
     sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
     params.push(parseInt(limit), parseInt(offset));
 
-    const [users] = await query(sql, params);
+    const users = await query(sql, params);
+
+    // Get total count
+    let countSql = 'SELECT COUNT(*) as total FROM users WHERE 1=1';
+    const countParams = [];
+
+    if (userRole === 'customer') {
+      countSql += ' AND role = ?';
+      countParams.push('customer');
+    } else if (role) {
+      countSql += ' AND role = ?';
+      countParams.push(role);
+    }
+
+    const countResult = await query(countSql, countParams);
+    const total = Array.isArray(countResult) && countResult.length > 0 
+      ? countResult[0].total 
+      : 0;
 
     res.json({
       success: true,
       data: {
-        users,
+        users: Array.isArray(users) ? users : [],
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit),
+        },
       },
     });
   } catch (error) {

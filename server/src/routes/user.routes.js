@@ -45,7 +45,8 @@ const changePasswordValidation = [
 ];
 
 // Routes
-router.get('/', authenticate, authorize('admin'), getUsers);
+// Allow both admin and customers to get users (customers see only other customers)
+router.get('/', authenticate, getUsers);
 router.get('/:id', authenticate, authorize('admin'), getUserById);
 router.put(
   '/profile',

@@ -350,6 +350,24 @@ class ApiClient {
       body: JSON.stringify({ currentPassword, newPassword }),
     });
   }
+
+  // Users/Customers endpoints
+  async getUsers(params?: {
+    page?: number;
+    limit?: number;
+    role?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.role) queryParams.append('role', params.role);
+
+    const query = queryParams.toString();
+    return this.request<{ users: any[]; pagination: any }>(
+      `/users${query ? `?${query}` : ''}`,
+      { method: 'GET' }
+    );
+  }
 }
 
 export const api = new ApiClient();
