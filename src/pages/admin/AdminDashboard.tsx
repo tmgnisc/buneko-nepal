@@ -20,6 +20,7 @@ import ProductsManagement from './ProductsManagement';
 import CategoriesManagement from './CategoriesManagement';
 import AdminProfile from './AdminProfile';
 import CustomersManagement from './CustomersManagement';
+import ContentManagement from './ContentManagement';
 
 const sidebarLinks = [
   { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
@@ -122,21 +123,6 @@ const OrdersManagement = () => (
     <div className="bg-card rounded-2xl p-6 shadow-soft">
       <p className="text-muted-foreground text-center py-8">
         Order management interface coming soon!
-      </p>
-    </div>
-  </div>
-);
-
-
-// Content Management
-const ContentManagement = () => (
-  <div className="space-y-6">
-    <h1 className="font-serif text-3xl font-bold text-foreground">
-      Content Management
-    </h1>
-    <div className="bg-card rounded-2xl p-6 shadow-soft">
-      <p className="text-muted-foreground text-center py-8">
-        Content management interface coming soon!
       </p>
     </div>
   </div>

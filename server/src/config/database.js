@@ -105,6 +105,19 @@ export const initializeTables = async () => {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
       },
       {
+        name: 'contents',
+        sql: `CREATE TABLE IF NOT EXISTS contents (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          title VARCHAR(150) NOT NULL,
+          url VARCHAR(500) NOT NULL,
+          platform ENUM('tiktok', 'other') DEFAULT 'tiktok',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_platform (platform),
+          INDEX idx_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+      },
+      {
         name: 'orders',
         sql: `CREATE TABLE IF NOT EXISTS orders (
           id INT AUTO_INCREMENT PRIMARY KEY,
@@ -201,7 +214,7 @@ export const initializeTables = async () => {
         return t.TABLE_NAME || t.table_name || (typeof t === 'string' ? t : Object.values(t)[0]);
       });
       
-      const requiredTables = ['users', 'categories', 'products', 'orders', 'order_items', 'wishlist'];
+      const requiredTables = ['users', 'categories', 'products', 'orders', 'order_items', 'wishlist', 'contents'];
       const missingTables = requiredTables.filter(t => !tableNames.includes(t));
 
       if (missingTables.length > 0) {

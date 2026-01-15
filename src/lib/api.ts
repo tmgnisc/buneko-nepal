@@ -273,6 +273,17 @@ class ApiClient {
     });
   }
 
+  async createCheckoutSession(payload: {
+    items: Array<{ product_id: number; quantity: number }>;
+    successUrl?: string;
+    cancelUrl?: string;
+  }) {
+    return this.request<{ url: string; sessionId: string }>('/payments/create-checkout-session', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   // Category endpoints
   async getCategories() {
     return this.request<{ categories: any[] }>('/categories', {
@@ -363,6 +374,39 @@ class ApiClient {
     return this.request('/users/profile/password', {
       method: 'PUT',
       body: JSON.stringify({ currentPassword, newPassword }),
+    });
+  }
+
+  // Content (TikTok) endpoints
+  async getContents(params?: { page?: number; limit?: number }) {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+
+    const query = queryParams.toString();
+    return this.request<{ contents: any[]; pagination: any }>(
+      `/contents${query ? `?${query}` : ''}`,
+      { method: 'GET' }
+    );
+  }
+
+  async createContent(data: { title: string; url: string }) {
+    return this.request<{ content: any }>(`/contents`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateContent(id: number, data: { title: string; url: string }) {
+    return this.request<{ content: any }>(`/contents/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteContent(id: number) {
+    return this.request(`/contents/${id}`, {
+      method: 'DELETE',
     });
   }
 

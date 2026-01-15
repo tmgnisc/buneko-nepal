@@ -4,9 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, ShoppingBag, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCart } from '@/contexts/CartContext';
 
 const navLinks = [
   { name: 'Home', href: '/' },
+  { name: 'Products', href: '/products' },
+  { name: 'Content', href: '/content' },
   { name: 'About', href: '/about' },
   { name: 'Services', href: '/services' },
   { name: 'Contact', href: '/contact' },
@@ -16,6 +19,7 @@ export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
   const { isAuthenticated, user, logout } = useAuth();
+  const { totalItems } = useCart();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-md border-b border-border">
@@ -52,8 +56,19 @@ export const Navbar = () => {
             ))}
           </div>
 
-          {/* Desktop Auth Buttons */}
+          {/* Desktop Cart + Auth Buttons */}
           <div className="hidden md:flex items-center gap-4">
+            {totalItems > 0 && (
+              <Link to="/cart">
+                <Button variant="ghost" size="sm" className="relative">
+                  <ShoppingBag className="h-4 w-4 mr-1" />
+                  Cart
+                  <span className="ml-1 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] h-5 min-w-[1.25rem] px-1">
+                    {totalItems}
+                  </span>
+                </Button>
+              </Link>
+            )}
             {isAuthenticated ? (
               <>
                 <Link to={user?.role === 'admin' || user?.role === 'superadmin' ? '/admin' : '/dashboard'}>
@@ -95,7 +110,7 @@ export const Navbar = () => {
         </div>
       </div>
 
-      {/* Mobile Menu */}
+          {/* Mobile Menu */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -120,6 +135,14 @@ export const Navbar = () => {
                 </Link>
               ))}
               <div className="pt-4 border-t border-border space-y-2">
+                {totalItems > 0 && (
+                  <Link to="/cart" onClick={() => setIsOpen(false)}>
+                    <Button variant="ghost" className="w-full flex items-center justify-center gap-2">
+                      <ShoppingBag className="h-4 w-4" />
+                      Cart ({totalItems})
+                    </Button>
+                  </Link>
+                )}
                 {isAuthenticated ? (
                   <>
                     <Link
