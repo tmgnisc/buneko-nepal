@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS orders (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
   total_amount DECIMAL(10, 2) NOT NULL,
+  payment_status ENUM('pending', 'paid', 'failed') DEFAULT 'pending',
   status ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled') DEFAULT 'pending',
   shipping_address TEXT NOT NULL,
   phone VARCHAR(20) NOT NULL,

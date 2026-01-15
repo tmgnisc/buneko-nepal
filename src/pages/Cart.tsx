@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { useCart } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
@@ -50,6 +50,55 @@ const CartPage = () => {
   const buildOrderItems = () =>
     items.map((item) => ({ product_id: item.id, quantity: item.quantity }));
 
+  // Handle return from Stripe (card payment)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentStatus = params.get('payment');
+    if (paymentStatus === 'success') {
+      const stored = localStorage.getItem('pending_card_order');
+      if (!stored || items.length === 0) {
+        return;
+      }
+      const payload = JSON.parse(stored) as {
+        items: Array<{ product_id: number; quantity: number }>;
+        shipping_address: string;
+        phone: string;
+        notes?: string;
+        latitude?: number | null;
+        longitude?: number | null;
+      };
+
+      // Avoid duplicate order creation
+      localStorage.removeItem('pending_card_order');
+      // Clean query param from URL
+      window.history.replaceState({}, '', window.location.pathname);
+
+      const createPaidOrder = async () => {
+        try {
+          setIsPlacingOrder(true);
+          await api.createOrder({
+            ...payload,
+            payment_status: 'paid',
+          });
+          toast.success('Order created successfully after card payment.');
+          clearCart();
+        } catch (error: any) {
+          console.error('Error creating order after payment:', error);
+          toast.error(error.message || 'Failed to save order after payment.');
+        } finally {
+          setIsPlacingOrder(false);
+        }
+      };
+
+      createPaidOrder();
+    } else if (paymentStatus === 'cancelled') {
+      // Clean URL and inform user
+      window.history.replaceState({}, '', window.location.pathname);
+      toast.error('Payment was cancelled.');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handlePlaceOrderCOD = async () => {
     if (!shippingAddress.trim() || !phone.trim()) {
       toast.error('Please enter shipping address and phone number.');
@@ -83,8 +132,18 @@ const CartPage = () => {
     setIsPlacingOrder(true);
     try {
       const frontendUrl = window.location.origin;
-      const response = await api.createCheckoutSession({
+      // Persist order details so we can create the order after successful payment
+      const pendingPayload = {
         items: buildOrderItems(),
+        shipping_address: shippingAddress.trim(),
+        phone: phone.trim(),
+        notes: notes.trim() || undefined,
+        latitude: latitude ?? null,
+        longitude: longitude ?? null,
+      };
+      localStorage.setItem('pending_card_order', JSON.stringify(pendingPayload));
+      const response = await api.createCheckoutSession({
+        items: pendingPayload.items,
         successUrl: `${frontendUrl}/cart?payment=success`,
         cancelUrl: `${frontendUrl}/cart?payment=cancelled`,
       });

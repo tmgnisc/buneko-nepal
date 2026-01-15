@@ -259,6 +259,9 @@ class ApiClient {
     items: Array<{ product_id: number; quantity: number }>;
     shipping_address: string;
     phone: string;
+    latitude?: number | null;
+    longitude?: number | null;
+    payment_status?: 'pending' | 'paid' | 'failed';
     notes?: string;
   }) {
     return this.request<{ order: any }>('/orders', {

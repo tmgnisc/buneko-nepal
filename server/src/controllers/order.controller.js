@@ -32,11 +32,11 @@ export const getOrders = async (req, res) => {
     sql += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?';
     params.push(parseInt(limit), parseInt(offset));
 
-    const [orders] = await query(sql, params);
+    const orders = await query(sql, params);
 
     // Get order items for each order
     for (const order of orders) {
-      const [items] = await query(
+      const items = await query(
         `SELECT 
           oi.id,
           oi.product_id,
@@ -74,7 +74,7 @@ export const getUserOrders = async (req, res) => {
     const { page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
-    const [orders] = await query(
+    const orders = await query(
       `SELECT 
         id,
         total_amount,
@@ -92,7 +92,7 @@ export const getUserOrders = async (req, res) => {
 
     // Get order items for each order
     for (const order of orders) {
-      const [items] = await query(
+      const items = await query(
         `SELECT 
           oi.id,
           oi.product_id,
@@ -140,7 +140,7 @@ export const getOrderById = async (req, res) => {
       params.push(userId);
     }
 
-    const [orders] = await query(sql, params);
+    const orders = await query(sql, params);
 
     if (orders.length === 0) {
       return res.status(404).json({
@@ -152,7 +152,7 @@ export const getOrderById = async (req, res) => {
     const order = orders[0];
 
     // Get order items
-    const [items] = await query(
+    const items = await query(
       `SELECT 
         oi.id,
         oi.product_id,
@@ -191,17 +191,17 @@ export const createOrder = async (req, res) => {
     await connection.beginTransaction();
 
     const userId = req.user.userId;
-    const { items, shipping_address, phone, notes, latitude, longitude } = req.body;
+    const { items, shipping_address, phone, notes, latitude, longitude, payment_status } = req.body;
 
     // Calculate total and validate products
     let totalAmount = 0;
     for (const item of items) {
-      const [products] = await query(
+      const products = await query(
         'SELECT id, price, stock FROM products WHERE id = ?',
         [item.product_id]
       );
 
-      if (products.length === 0) {
+      if (!Array.isArray(products) || products.length === 0) {
         await connection.rollback();
         return res.status(404).json({
           success: false,
@@ -225,16 +225,25 @@ export const createOrder = async (req, res) => {
 
     // Create order
     const [orderResult] = await query(
-      `INSERT INTO orders (user_id, total_amount, status, shipping_address, phone, latitude, longitude, notes)
-       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?)`,
-      [userId, totalAmount, shipping_address, phone, latitude || null, longitude || null, notes || null]
+      `INSERT INTO orders (user_id, total_amount, payment_status, status, shipping_address, phone, latitude, longitude, notes)
+       VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
+      [
+        userId,
+        totalAmount,
+        payment_status || 'pending',
+        shipping_address,
+        phone,
+        latitude || null,
+        longitude || null,
+        notes || null,
+      ]
     );
 
     const orderId = orderResult.insertId;
 
     // Create order items and update stock
     for (const item of items) {
-      const [products] = await query(
+      const products = await query(
         'SELECT price FROM products WHERE id = ?',
         [item.product_id]
       );
@@ -257,8 +266,8 @@ export const createOrder = async (req, res) => {
     await connection.commit();
 
     // Get created order with items
-    const [orders] = await query('SELECT * FROM orders WHERE id = ?', [orderId]);
-    const [orderItems] = await query(
+    const orders = await query('SELECT * FROM orders WHERE id = ?', [orderId]);
+    const orderItems = await query(
       `SELECT 
         oi.*,
         p.name as product_name,
@@ -315,7 +324,7 @@ export const updateOrderStatus = async (req, res) => {
       [status, id]
     );
 
-    const [orders] = await query('SELECT * FROM orders WHERE id = ?', [id]);
+    const orders = await query('SELECT * FROM orders WHERE id = ?', [id]);
 
     res.json({
       success: true,
@@ -343,7 +352,7 @@ export const cancelOrder = async (req, res) => {
     const userId = req.user.userId;
 
     // Check if order exists and belongs to user
-    const [orders] = await query(
+    const orders = await query(
       'SELECT id, status FROM orders WHERE id = ? AND user_id = ?',
       [id, userId]
     );
@@ -375,7 +384,7 @@ export const cancelOrder = async (req, res) => {
     }
 
     // Restore stock
-    const [items] = await query(
+    const items = await query(
       'SELECT product_id, quantity FROM order_items WHERE order_id = ?',
       [id]
     );

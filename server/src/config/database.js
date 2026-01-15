@@ -123,6 +123,7 @@ export const initializeTables = async () => {
           id INT AUTO_INCREMENT PRIMARY KEY,
           user_id INT NOT NULL,
           total_amount DECIMAL(10, 2) NOT NULL,
+          payment_status ENUM('pending', 'paid', 'failed') DEFAULT 'pending',
           status ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled') DEFAULT 'pending',
           shipping_address TEXT NOT NULL,
           phone VARCHAR(20) NOT NULL,
@@ -246,7 +247,7 @@ export const initializeTables = async () => {
       }
     } catch (error) {
       // Ignore if column already exists
-      if (error.code === 'ER_DUP_FIELDNAME' || error.message.includes('Duplicate column name')) {
+      if (error.code === 'ER_DUP_FIELDNAME' || (error.message || '').includes('Duplicate column name')) {
         // Column already exists, that's fine
       } else {
         console.warn('⚠️  Could not add profile_image_url column:', error.message);
@@ -270,10 +271,58 @@ export const initializeTables = async () => {
       }
     } catch (error) {
       // Ignore if column already exists
-      if (error.code === 'ER_DUP_FIELDNAME' || error.message.includes('Duplicate column name')) {
+      if (error.code === 'ER_DUP_FIELDNAME' || (error.message || '').includes('Duplicate column name')) {
         // Column already exists, that's fine
       } else {
         console.warn('⚠️  Could not add is_active column:', error.message);
+      }
+    }
+
+    // Add payment_status column to orders if it doesn't exist (for existing databases)
+    try {
+      const columns = await query(`
+        SELECT COLUMN_NAME 
+        FROM information_schema.COLUMNS 
+        WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'payment_status'
+      `, [process.env.DB_NAME || 'EduConnect']);
+
+      if (!Array.isArray(columns) || columns.length === 0) {
+        await query(`
+          ALTER TABLE orders 
+          ADD COLUMN payment_status ENUM('pending', 'paid', 'failed') DEFAULT 'pending' 
+          AFTER total_amount
+        `);
+        console.log('  ✓ Added payment_status column to orders table');
+      }
+    } catch (error) {
+      if (error.code === 'ER_DUP_FIELDNAME' || (error.message || '').includes('Duplicate column name')) {
+        // Column already exists
+      } else {
+        console.warn('⚠️  Could not add payment_status column:', error.message);
+      }
+    }
+
+    // Add latitude/longitude columns to orders if they don't exist (for existing databases)
+    try {
+      const latCols = await query(`
+        SELECT COLUMN_NAME 
+        FROM information_schema.COLUMNS 
+        WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'latitude'
+      `, [process.env.DB_NAME || 'EduConnect']);
+
+      if (!Array.isArray(latCols) || latCols.length === 0) {
+        await query(`
+          ALTER TABLE orders 
+          ADD COLUMN latitude DECIMAL(10, 8) NULL AFTER phone,
+          ADD COLUMN longitude DECIMAL(11, 8) NULL AFTER latitude
+        `);
+        console.log('  ✓ Added latitude/longitude columns to orders table');
+      }
+    } catch (error) {
+      if (error.code === 'ER_DUP_FIELDNAME' || (error.message || '').includes('Duplicate column name')) {
+        // Columns already exist
+      } else {
+        console.warn('⚠️  Could not add latitude/longitude columns:', error.message);
       }
     }
 
