@@ -19,6 +19,8 @@ import {
   EyeOff,
   Save,
   Sparkles,
+  CreditCard,
+  DollarSign,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +36,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
 
 const sidebarLinks = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -45,54 +49,185 @@ const sidebarLinks = [
 ];
 
 // Dashboard Overview Component
-const DashboardOverview = () => (
-  <div className="space-y-6">
-    <div>
-      <h1 className="font-serif text-3xl font-bold text-foreground">
-        Welcome Back!
-      </h1>
-      <p className="text-muted-foreground mt-1">
-        Manage your orders and explore our handmade collection.
-      </p>
-    </div>
+const DashboardOverview = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [stats, setStats] = useState({
+    totalOrders: 0,
+    activeOrders: 0,
+    wishlistItems: 0,
+    recentOrders: [] as any[],
+  });
+  const [loading, setLoading] = useState(true);
 
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {[
-        { label: 'Total Orders', value: '12', icon: Package },
-        { label: 'Wishlist Items', value: '5', icon: Heart },
-        { label: 'Active Orders', value: '2', icon: ShoppingBag },
-      ].map((stat) => (
-        <div
-          key={stat.label}
-          className="bg-card rounded-2xl p-6 shadow-soft"
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <stat.icon className="h-6 w-6 text-primary" />
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        setLoading(true);
+        const response = await api.getCustomerDashboardStats();
+        if (response.success && response.data) {
+          setStats({
+            totalOrders: response.data.totalOrders || 0,
+            activeOrders: response.data.activeOrders || 0,
+            wishlistItems: response.data.wishlistItems || 0,
+            recentOrders: response.data.recentOrders || [],
+          });
+        }
+      } catch (error: any) {
+        console.error('Error loading dashboard stats:', error);
+        toast.error(error.message || 'Failed to load dashboard statistics');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadStats();
+  }, []);
+
+  const getStatusBadge = (status: string) => {
+    const statusColors: Record<string, string> = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      processing: 'bg-blue-100 text-blue-800',
+      shipped: 'bg-purple-100 text-purple-800',
+      delivered: 'bg-green-100 text-green-800',
+      cancelled: 'bg-red-100 text-red-800',
+    };
+    return (
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${
+          statusColors[status] || 'bg-gray-100 text-gray-800'
+        }`}
+      >
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-serif text-3xl font-bold text-foreground">
+          Welcome Back{user?.name ? `, ${user.name.split(' ')[0]}` : ''}!
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Manage your orders and explore our handmade collection.
+        </p>
+      </div>
+
+      {/* Statistics Cards */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <div key={idx} className="bg-card rounded-2xl p-6 shadow-soft">
+              <div className="animate-pulse space-y-3">
+                <div className="h-12 w-12 rounded-xl bg-muted"></div>
+                <div className="h-4 bg-muted rounded w-1/2"></div>
+                <div className="h-8 bg-muted rounded w-1/3"></div>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">{stat.label}</p>
-              <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-            </div>
-          </div>
+          ))}
         </div>
-      ))}
-    </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { label: 'Total Orders', value: stats.totalOrders, icon: Package },
+            { label: 'Wishlist Items', value: stats.wishlistItems, icon: Heart },
+            { label: 'Active Orders', value: stats.activeOrders, icon: ShoppingBag },
+          ].map((stat) => (
+            <div
+              key={stat.label}
+              className="bg-card rounded-2xl p-6 shadow-soft hover:shadow-card transition-shadow"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <stat.icon className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">{stat.label}</p>
+                  <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
-    <div className="bg-card rounded-2xl p-6 shadow-soft">
-      <h2 className="font-serif text-xl font-semibold text-foreground mb-4">
-        Recent Orders
-      </h2>
-      <div className="text-center py-8 text-muted-foreground">
-        <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
-        <p>No orders yet. Start shopping!</p>
-        <Link to="/services">
-          <Button className="mt-4">Browse Products</Button>
-        </Link>
+      {/* Recent Orders */}
+      <div className="bg-card rounded-2xl p-6 shadow-soft">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-serif text-xl font-semibold text-foreground">
+            Recent Orders
+          </h2>
+          {stats.recentOrders.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/dashboard/orders')}
+              className="rounded-xl"
+            >
+              View All
+            </Button>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, idx) => (
+              <div key={idx} className="animate-pulse">
+                <div className="h-16 bg-muted rounded-lg"></div>
+              </div>
+            ))}
+          </div>
+        ) : stats.recentOrders.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+            <p>No orders yet. Start shopping!</p>
+            <Link to="/products">
+              <Button className="mt-4 rounded-xl">Browse Products</Button>
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {stats.recentOrders.map((order) => (
+              <div
+                key={order.id}
+                className="flex items-center justify-between p-4 bg-secondary/30 rounded-xl hover:bg-secondary/50 transition-colors cursor-pointer"
+                onClick={() => navigate('/dashboard/orders')}
+              >
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="text-sm font-medium text-foreground">
+                      Order #{order.id}
+                    </span>
+                    {getStatusBadge(order.status)}
+                    {order.payment_status === 'paid' && (
+                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Paid
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-1">
+                    {order.items}
+                  </p>
+                  <p className="text-sm font-semibold text-primary mt-1">
+                    NPR {order.total_amount.toFixed(2)}
+                  </p>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {new Date(order.created_at).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Products Page (dynamic)
 const ProductsPage = () => {
@@ -393,6 +528,16 @@ const CustomizationPage = () => {
   });
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [expandedCustomization, setExpandedCustomization] = useState<number | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'card'>('cod');
+  const [orderFormData, setOrderFormData] = useState({
+    shipping_address: '',
+    phone: '',
+    latitude: null as number | null,
+    longitude: null as number | null,
+    notes: '',
+  });
+  const [isCompletingOrder, setIsCompletingOrder] = useState(false);
 
   const loadCustomizations = async () => {
     try {
@@ -416,6 +561,43 @@ const CustomizationPage = () => {
     loadCustomizations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
+
+  // Handle Stripe payment return
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentStatus = params.get('payment');
+    const customizationId = params.get('customization_id');
+
+    if (paymentStatus === 'success' && customizationId) {
+      const pendingOrder = localStorage.getItem('pending_customization_order');
+      if (pendingOrder) {
+        const orderData = JSON.parse(pendingOrder);
+        const createPaidOrder = async () => {
+          try {
+            await api.completeCustomizationOrder(parseInt(customizationId), {
+              ...orderData,
+              payment_status: 'paid',
+            });
+            toast.success('Order placed successfully! Payment received.');
+            localStorage.removeItem('pending_customization_order');
+            window.history.replaceState({}, '', window.location.pathname);
+            loadCustomizations();
+          } catch (error: any) {
+            console.error('Error creating order after payment:', error);
+            toast.error(
+              error.message || 'Failed to save order after payment. Please contact support.'
+            );
+          }
+        };
+        createPaidOrder();
+      }
+    } else if (paymentStatus === 'cancelled') {
+      window.history.replaceState({}, '', window.location.pathname);
+      toast.error('Payment was cancelled.');
+      localStorage.removeItem('pending_customization_order');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -474,6 +656,98 @@ const CustomizationPage = () => {
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </span>
     );
+  };
+
+  const markerIcon = new L.Icon({
+    iconUrl:
+      'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+    iconRetinaUrl:
+      'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+    shadowUrl:
+      'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    shadowSize: [41, 41],
+  });
+
+  const LocationSelector = ({ onChange }: { onChange: (lat: number, lng: number) => void }) => {
+    useMapEvents({
+      click(e) {
+        onChange(e.latlng.lat, e.latlng.lng);
+      },
+    });
+    return null;
+  };
+
+  const handleCompleteOrder = async (customizationId: number) => {
+    if (!orderFormData.shipping_address.trim() || !orderFormData.phone.trim()) {
+      toast.error('Please enter shipping address and phone number');
+      return;
+    }
+
+    setIsCompletingOrder(true);
+    try {
+      await api.completeCustomizationOrder(customizationId, {
+        shipping_address: orderFormData.shipping_address.trim(),
+        phone: orderFormData.phone.trim(),
+        latitude: orderFormData.latitude ?? undefined,
+        longitude: orderFormData.longitude ?? undefined,
+        notes: orderFormData.notes.trim() || undefined,
+        payment_status: paymentMethod === 'cod' ? 'pending' : 'paid',
+      });
+      toast.success('Order created successfully!');
+      setExpandedCustomization(null);
+      setOrderFormData({
+        shipping_address: '',
+        phone: '',
+        latitude: null,
+        longitude: null,
+        notes: '',
+      });
+      loadCustomizations();
+    } catch (error: any) {
+      console.error('Error completing order:', error);
+      toast.error(error.message || 'Failed to create order');
+    } finally {
+      setIsCompletingOrder(false);
+    }
+  };
+
+  const handleStripeCheckout = async (customizationId: number, quotedPrice: number) => {
+    if (!orderFormData.shipping_address.trim() || !orderFormData.phone.trim()) {
+      toast.error('Please enter shipping address and phone number');
+      return;
+    }
+
+    setIsCompletingOrder(true);
+    try {
+      const frontendUrl = window.location.origin;
+      const pendingPayload = {
+        customization_id: customizationId,
+        shipping_address: orderFormData.shipping_address.trim(),
+        phone: orderFormData.phone.trim(),
+        notes: orderFormData.notes.trim() || undefined,
+        latitude: orderFormData.latitude ?? null,
+        longitude: orderFormData.longitude ?? null,
+      };
+      localStorage.setItem('pending_customization_order', JSON.stringify(pendingPayload));
+
+      const response = await api.createCheckoutSession({
+        items: [{ product_id: 0, quantity: 1, price: quotedPrice }],
+        successUrl: `${frontendUrl}/dashboard/customization?payment=success&customization_id=${customizationId}`,
+        cancelUrl: `${frontendUrl}/dashboard/customization?payment=cancelled`,
+      });
+
+      if (response.success && response.data?.url) {
+        window.location.href = response.data.url;
+      } else {
+        throw new Error(response.message || 'Failed to start checkout');
+      }
+    } catch (error: any) {
+      console.error('Error creating Stripe checkout session:', error);
+      toast.error(error.message || 'Failed to start card payment');
+      setIsCompletingOrder(false);
+    }
   };
 
   return (
@@ -762,17 +1036,196 @@ const CustomizationPage = () => {
                   </div>
                 )}
 
+                {/* Payment and Delivery Form for Accepted Customizations */}
+                {customization.status === 'accepted' && customization.quoted_price && (
+                  <div className="pt-4 border-t border-border">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (expandedCustomization === customization.id) {
+                          setExpandedCustomization(null);
+                        } else {
+                          setExpandedCustomization(customization.id);
+                          setOrderFormData({
+                            shipping_address: '',
+                            phone: '',
+                            latitude: null,
+                            longitude: null,
+                            notes: '',
+                          });
+                          setPaymentMethod('cod');
+                        }
+                      }}
+                      className="w-full rounded-xl"
+                    >
+                      {expandedCustomization === customization.id
+                        ? 'Cancel'
+                        : 'Complete Order & Payment'}
+                    </Button>
+
+                    {expandedCustomization === customization.id && (
+                      <div className="mt-4 space-y-4 p-4 bg-secondary/30 rounded-lg">
+                        <div>
+                          <p className="text-sm font-semibold mb-2">Total Amount</p>
+                          <p className="text-lg font-bold text-primary">
+                            NPR {parseFloat(customization.quoted_price).toFixed(2)}
+                          </p>
+                        </div>
+
+                        {/* Payment Method */}
+                        <div>
+                          <Label className="mb-2 block">Payment Method *</Label>
+                          <div className="flex flex-col gap-2">
+                            <label className="inline-flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name={`payment-${customization.id}`}
+                                value="cod"
+                                checked={paymentMethod === 'cod'}
+                                onChange={() => setPaymentMethod('cod')}
+                              />
+                              <span className="text-sm">Cash on Delivery</span>
+                            </label>
+                            <label className="inline-flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name={`payment-${customization.id}`}
+                                value="card"
+                                checked={paymentMethod === 'card'}
+                                onChange={() => setPaymentMethod('card')}
+                              />
+                              <span className="text-sm">Online Card Payment (Stripe)</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Shipping Address */}
+                        <div>
+                          <Label htmlFor={`address-${customization.id}`}>
+                            Shipping Address *
+                          </Label>
+                          <Textarea
+                            id={`address-${customization.id}`}
+                            value={orderFormData.shipping_address}
+                            onChange={(e) =>
+                              setOrderFormData({
+                                ...orderFormData,
+                                shipping_address: e.target.value,
+                              })
+                            }
+                            placeholder="Enter complete shipping address..."
+                            rows={3}
+                            required
+                          />
+                        </div>
+
+                        {/* Phone */}
+                        <div>
+                          <Label htmlFor={`phone-${customization.id}`}>Phone Number *</Label>
+                          <Input
+                            id={`phone-${customization.id}`}
+                            value={orderFormData.phone}
+                            onChange={(e) =>
+                              setOrderFormData({ ...orderFormData, phone: e.target.value })
+                            }
+                            placeholder="e.g., +9779843062389"
+                            required
+                          />
+                        </div>
+
+                        {/* Map */}
+                        <div>
+                          <Label className="mb-2 block">Delivery Location (Optional)</Label>
+                          <p className="text-xs text-muted-foreground mb-2">
+                            Tap on the map to set your delivery location
+                          </p>
+                          <div className="w-full h-64 rounded-xl overflow-hidden border border-border">
+                            <MapContainer
+                              center={[27.7172, 85.3240]}
+                              zoom={13}
+                              style={{ height: '100%', width: '100%' }}
+                              scrollWheelZoom={false}
+                            >
+                              <TileLayer
+                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                              />
+                              <LocationSelector
+                                onChange={(lat, lng) => {
+                                  setOrderFormData({
+                                    ...orderFormData,
+                                    latitude: lat,
+                                    longitude: lng,
+                                  });
+                                }}
+                              />
+                              {orderFormData.latitude !== null &&
+                                orderFormData.longitude !== null && (
+                                  <Marker
+                                    position={[orderFormData.latitude, orderFormData.longitude]}
+                                    icon={markerIcon}
+                                  />
+                                )}
+                            </MapContainer>
+                          </div>
+                          {orderFormData.latitude !== null &&
+                            orderFormData.longitude !== null && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Selected: {orderFormData.latitude.toFixed(5)},{' '}
+                                {orderFormData.longitude.toFixed(5)}
+                              </p>
+                            )}
+                        </div>
+
+                        {/* Notes */}
+                        <div>
+                          <Label htmlFor={`notes-${customization.id}`}>Additional Notes</Label>
+                          <Textarea
+                            id={`notes-${customization.id}`}
+                            value={orderFormData.notes}
+                            onChange={(e) =>
+                              setOrderFormData({ ...orderFormData, notes: e.target.value })
+                            }
+                            placeholder="Any additional notes..."
+                            rows={2}
+                          />
+                        </div>
+
+                        {/* Submit Button */}
+                        <Button
+                          className="w-full rounded-xl"
+                          disabled={isCompletingOrder}
+                          onClick={() => {
+                            if (paymentMethod === 'cod') {
+                              handleCompleteOrder(customization.id);
+                            } else {
+                              handleStripeCheckout(
+                                customization.id,
+                                parseFloat(customization.quoted_price)
+                              );
+                            }
+                          }}
+                        >
+                          {isCompletingOrder
+                            ? 'Processing...'
+                            : paymentMethod === 'cod'
+                            ? 'Place Order (Cash on Delivery)'
+                            : 'Pay with Card (Stripe)'}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="pt-2 border-t border-border">
                   <p className="text-xs text-muted-foreground">
                     Submitted on{' '}
-                    {new Date(customization.created_at).toLocaleDateString(
-                      'en-US',
-                      {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      }
-                    )}
+                    {new Date(customization.created_at).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
                   </p>
                 </div>
               </CardContent>

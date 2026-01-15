@@ -11,6 +11,9 @@ import {
   DollarSign,
   Palette,
   Gift,
+  ShoppingCart,
+  MapPin,
+  Phone,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -66,7 +69,9 @@ const CustomizationsManagement = () => {
   const [customizations, setCustomizations] = useState<Customization[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreateOrderDialogOpen, setIsCreateOrderDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const [selectedCustomization, setSelectedCustomization] = useState<Customization | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -77,6 +82,14 @@ const CustomizationsManagement = () => {
     status: 'pending',
     admin_notes: '',
     quoted_price: '',
+  });
+
+  const [orderFormData, setOrderFormData] = useState({
+    shipping_address: '',
+    phone: '',
+    latitude: '',
+    longitude: '',
+    notes: '',
   });
 
   useEffect(() => {
@@ -173,6 +186,50 @@ const CustomizationsManagement = () => {
       toast.error(error.message || 'Failed to update response');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const openCreateOrderDialog = (customization: Customization) => {
+    if (customization.status !== 'accepted' || !customization.quoted_price) {
+      toast.error('Only accepted customizations with quoted price can be converted to orders');
+      return;
+    }
+    setSelectedCustomization(customization);
+    setOrderFormData({
+      shipping_address: '',
+      phone: '',
+      latitude: '',
+      longitude: '',
+      notes: '',
+    });
+    setIsCreateOrderDialogOpen(true);
+  };
+
+  const handleCreateOrder = async () => {
+    if (!selectedCustomization) return;
+
+    if (!orderFormData.shipping_address.trim() || !orderFormData.phone.trim()) {
+      toast.error('Shipping address and phone are required');
+      return;
+    }
+
+    setIsCreatingOrder(true);
+    try {
+      await api.createOrderFromCustomization(selectedCustomization.id, {
+        shipping_address: orderFormData.shipping_address.trim(),
+        phone: orderFormData.phone.trim(),
+        latitude: orderFormData.latitude ? parseFloat(orderFormData.latitude) : undefined,
+        longitude: orderFormData.longitude ? parseFloat(orderFormData.longitude) : undefined,
+        notes: orderFormData.notes.trim() || undefined,
+      });
+      toast.success('Order created successfully');
+      setIsCreateOrderDialogOpen(false);
+      loadCustomizations();
+    } catch (error: any) {
+      console.error('Error creating order:', error);
+      toast.error(error.message || 'Failed to create order');
+    } finally {
+      setIsCreatingOrder(false);
     }
   };
 
@@ -376,6 +433,17 @@ const CustomizationsManagement = () => {
                     <MessageSquare className="h-4 w-4 mr-2" />
                     Respond
                   </Button>
+                  {customization.status === 'accepted' && customization.quoted_price && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => openCreateOrderDialog(customization)}
+                      className="rounded-xl bg-primary text-primary-foreground"
+                    >
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      Create Order
+                    </Button>
+                  )}
                   {customization.status !== 'accepted' && (
                     <Button
                       variant="outline"
@@ -531,6 +599,126 @@ const CustomizationsManagement = () => {
               className="rounded-xl"
             >
               {isSubmitting ? 'Saving...' : 'Save Response'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Order Dialog */}
+      <Dialog open={isCreateOrderDialogOpen} onOpenChange={setIsCreateOrderDialogOpen}>
+        <DialogContent className="max-w-2xl rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Create Order from Customization</DialogTitle>
+            <DialogDescription>
+              Create an order for this accepted customization request.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedCustomization && (
+            <div className="space-y-4 py-4">
+              {/* Customization Details */}
+              <div className="bg-secondary/30 p-4 rounded-lg space-y-2">
+                <p className="text-sm font-medium">{selectedCustomization.title}</p>
+                <p className="text-xs text-muted-foreground">
+                  {selectedCustomization.user_name} ({selectedCustomization.user_email})
+                </p>
+                {selectedCustomization.quoted_price && (
+                  <p className="text-lg font-semibold text-primary">
+                    Quoted Price: NPR {parseFloat(selectedCustomization.quoted_price.toString()).toFixed(2)}
+                  </p>
+                )}
+              </div>
+
+              {/* Shipping Address */}
+              <div>
+                <Label htmlFor="shipping_address">Shipping Address *</Label>
+                <Textarea
+                  id="shipping_address"
+                  value={orderFormData.shipping_address}
+                  onChange={(e) =>
+                    setOrderFormData({ ...orderFormData, shipping_address: e.target.value })
+                  }
+                  placeholder="Enter complete shipping address..."
+                  rows={3}
+                  required
+                />
+              </div>
+
+              {/* Phone */}
+              <div>
+                <Label htmlFor="phone">Phone Number *</Label>
+                <Input
+                  id="phone"
+                  value={orderFormData.phone}
+                  onChange={(e) =>
+                    setOrderFormData({ ...orderFormData, phone: e.target.value })
+                  }
+                  placeholder="e.g., +9779843062389"
+                  required
+                />
+              </div>
+
+              {/* Location Coordinates */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="latitude">Latitude (optional)</Label>
+                  <Input
+                    id="latitude"
+                    type="number"
+                    step="any"
+                    value={orderFormData.latitude}
+                    onChange={(e) =>
+                      setOrderFormData({ ...orderFormData, latitude: e.target.value })
+                    }
+                    placeholder="e.g., 27.7172"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="longitude">Longitude (optional)</Label>
+                  <Input
+                    id="longitude"
+                    type="number"
+                    step="any"
+                    value={orderFormData.longitude}
+                    onChange={(e) =>
+                      setOrderFormData({ ...orderFormData, longitude: e.target.value })
+                    }
+                    placeholder="e.g., 85.3240"
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <Label htmlFor="notes">Additional Notes</Label>
+                <Textarea
+                  id="notes"
+                  value={orderFormData.notes}
+                  onChange={(e) =>
+                    setOrderFormData({ ...orderFormData, notes: e.target.value })
+                  }
+                  placeholder="Any additional notes for this order..."
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsCreateOrderDialogOpen(false)}
+              disabled={isCreatingOrder}
+              className="rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateOrder}
+              disabled={isCreatingOrder}
+              className="rounded-xl"
+            >
+              {isCreatingOrder ? 'Creating...' : 'Create Order'}
             </Button>
           </DialogFooter>
         </DialogContent>

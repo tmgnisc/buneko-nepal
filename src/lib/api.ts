@@ -525,6 +525,18 @@ class ApiClient {
     });
   }
 
+  // Customer dashboard endpoints
+  async getCustomerDashboardStats() {
+    return this.request<{
+      totalOrders: number;
+      activeOrders: number;
+      wishlistItems: number;
+      recentOrders: any[];
+    }>('/customer/dashboard/stats', {
+      method: 'GET',
+    });
+  }
+
   // Customization endpoints
   async getUserCustomizations(params?: { page?: number; limit?: number }) {
     const queryParams = new URLSearchParams();
@@ -587,6 +599,39 @@ class ApiClient {
   ) {
     return this.request<{ customization: any }>(`/customizations/${id}/status`, {
       method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async createOrderFromCustomization(
+    id: number,
+    data: {
+      shipping_address: string;
+      phone: string;
+      latitude?: number;
+      longitude?: number;
+      notes?: string;
+    }
+  ) {
+    return this.request<{ order: any }>(`/customizations/${id}/create-order`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async completeCustomizationOrder(
+    id: number,
+    data: {
+      shipping_address: string;
+      phone: string;
+      latitude?: number;
+      longitude?: number;
+      notes?: string;
+      payment_status?: 'pending' | 'paid';
+    }
+  ) {
+    return this.request<{ order: any }>(`/customizations/${id}/complete-order`, {
+      method: 'POST',
       body: JSON.stringify(data),
     });
   }

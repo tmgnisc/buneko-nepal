@@ -6,6 +6,8 @@ import {
   getCustomizationById,
   createCustomization,
   updateCustomizationStatus,
+  createOrderFromCustomization,
+  completeCustomizationOrder,
 } from '../controllers/customization.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { handleValidationErrors } from '../utils/validation.js';
@@ -60,6 +62,32 @@ router.patch(
   statusValidation,
   handleValidationErrors,
   updateCustomizationStatus
+);
+
+// Create order from accepted customization (admin)
+router.post(
+  '/:id/create-order',
+  authenticate,
+  authorize('admin'),
+  [
+    body('shipping_address').trim().notEmpty().withMessage('Shipping address is required'),
+    body('phone').trim().notEmpty().withMessage('Phone number is required'),
+  ],
+  handleValidationErrors,
+  createOrderFromCustomization
+);
+
+// Complete customization order (user) - add payment and delivery details
+router.post(
+  '/:id/complete-order',
+  authenticate,
+  [
+    body('shipping_address').trim().notEmpty().withMessage('Shipping address is required'),
+    body('phone').trim().notEmpty().withMessage('Phone number is required'),
+    body('payment_status').optional().isIn(['pending', 'paid']).withMessage('Invalid payment status'),
+  ],
+  handleValidationErrors,
+  completeCustomizationOrder
 );
 
 export default router;

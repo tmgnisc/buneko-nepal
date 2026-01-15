@@ -306,3 +306,199 @@ export const updateCustomizationStatus = async (req, res) => {
   }
 };
 
+// Create order from accepted customization (admin only)
+export const createOrderFromCustomization = async (req, res) => {
+  const connection = await getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const { id } = req.params;
+    const { shipping_address, phone, latitude, longitude, notes } = req.body;
+
+    // Get customization
+    const customizations = await query(
+      'SELECT * FROM customizations WHERE id = ?',
+      [id]
+    );
+
+    if (!Array.isArray(customizations) || customizations.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Customization not found',
+      });
+    }
+
+    const customization = customizations[0];
+
+    if (customization.status !== 'accepted') {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Only accepted customizations can be converted to orders',
+      });
+    }
+
+    if (!customization.quoted_price) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Customization must have a quoted price before creating order',
+      });
+    }
+
+    // Create order from customization
+    const [orderResult] = await connection.execute(
+      `INSERT INTO orders (user_id, total_amount, payment_status, status, shipping_address, phone, latitude, longitude, notes)
+       VALUES (?, ?, 'pending', 'pending', ?, ?, ?, ?, ?)`,
+      [
+        customization.user_id,
+        customization.quoted_price,
+        shipping_address,
+        phone,
+        latitude || null,
+        longitude || null,
+        notes || `Customization Order: ${customization.title}\n${customization.description}`,
+      ]
+    );
+
+    const orderId = orderResult.insertId;
+
+    // Update customization status to completed
+    await connection.execute(
+      'UPDATE customizations SET status = ?, updated_at = NOW() WHERE id = ?',
+      ['completed', id]
+    );
+
+    await connection.commit();
+
+    // Get created order
+    const orders = await query(
+      `SELECT 
+        o.*,
+        u.name as user_name,
+        u.email as user_email
+      FROM orders o
+      LEFT JOIN users u ON o.user_id = u.id
+      WHERE o.id = ?`,
+      [orderId]
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Order created from customization successfully',
+      data: {
+        order: Array.isArray(orders) && orders.length > 0 ? orders[0] : null,
+      },
+    });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Create order from customization error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating order from customization',
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+// Complete customization order (user) - add payment and delivery details
+export const completeCustomizationOrder = async (req, res) => {
+  const connection = await getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const userId = req.user.userId;
+    const { id } = req.params;
+    const { shipping_address, phone, latitude, longitude, notes, payment_status } = req.body;
+
+    // Get customization
+    const customizations = await query(
+      'SELECT * FROM customizations WHERE id = ? AND user_id = ?',
+      [id, userId]
+    );
+
+    if (!Array.isArray(customizations) || customizations.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Customization not found',
+      });
+    }
+
+    const customization = customizations[0];
+
+    if (customization.status !== 'accepted') {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Only accepted customizations can be converted to orders',
+      });
+    }
+
+    if (!customization.quoted_price) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Customization must have a quoted price',
+      });
+    }
+
+    // Create order from customization
+    const [orderResult] = await connection.execute(
+      `INSERT INTO orders (user_id, total_amount, payment_status, status, shipping_address, phone, latitude, longitude, notes)
+       VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
+      [
+        userId,
+        customization.quoted_price,
+        payment_status || 'pending',
+        shipping_address,
+        phone,
+        latitude || null,
+        longitude || null,
+        notes || `Customization Order: ${customization.title}\n${customization.description}`,
+      ]
+    );
+
+    const orderId = orderResult.insertId;
+
+    // Update customization status to completed
+    await connection.execute(
+      'UPDATE customizations SET status = ?, updated_at = NOW() WHERE id = ?',
+      ['completed', id]
+    );
+
+    await connection.commit();
+
+    // Get created order
+    const orders = await query(
+      `SELECT 
+        o.*,
+        u.name as user_name,
+        u.email as user_email
+      FROM orders o
+      LEFT JOIN users u ON o.user_id = u.id
+      WHERE o.id = ?`,
+      [orderId]
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Order created successfully',
+      data: {
+        order: Array.isArray(orders) && orders.length > 0 ? orders[0] : null,
+      },
+    });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Complete customization order error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating order from customization',
+    });
+  } finally {
+    connection.release();
+  }
+};
+
