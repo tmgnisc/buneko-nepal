@@ -43,13 +43,17 @@ class ApiClient {
       }
 
       if (!response.ok) {
-        // If unauthorized, clear token and redirect to login
+        // If unauthorized, handle it appropriately
         if (response.status === 401) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          // Only redirect if not already on login page
-          if (window.location.pathname !== '/login') {
-            window.location.href = '/login';
+          // For getCurrentUser endpoint, don't clear session here - let AuthContext handle it
+          // For other endpoints, clear and redirect
+          if (!endpoint.includes('/auth/me')) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            // Only redirect if not already on login/signup page
+            if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
+              window.location.href = '/login';
+            }
           }
         }
         // Provide more detailed error message
@@ -90,9 +94,22 @@ class ApiClient {
   }
 
   async getCurrentUser() {
-    return this.request<{ user: any }>('/auth/me', {
-      method: 'GET',
-    });
+    try {
+      return await this.request<{ user: any }>('/auth/me', {
+        method: 'GET',
+      });
+    } catch (error: any) {
+      // Re-throw with more context for AuthContext to handle
+      if (error.message && (
+        error.message.includes('401') || 
+        error.message.includes('Unauthorized') ||
+        error.message.includes('Invalid token') ||
+        error.message.includes('Token expired')
+      )) {
+        throw new Error('Authentication failed');
+      }
+      throw error;
+    }
   }
 
   // Product endpoints

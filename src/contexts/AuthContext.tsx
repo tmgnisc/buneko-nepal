@@ -6,6 +6,9 @@ interface User {
   email: string;
   name: string;
   role: 'customer' | 'admin' | 'superadmin';
+  phone?: string;
+  address?: string;
+  profile_image_url?: string;
 }
 
 interface AuthContextType {
@@ -44,13 +47,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const userData = response.data.user;
         localStorage.setItem('user', JSON.stringify(userData));
         setUser(userData);
+        return true;
       }
-    } catch (error) {
+      return false;
+    } catch (error: any) {
       console.error('Error refreshing user:', error);
-      // If refresh fails, clear storage
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      setUser(null);
+      // Only clear storage if it's an actual authentication error
+      if (error.message && (
+        error.message.includes('Authentication failed') ||
+        error.message.includes('401') ||
+        error.message.includes('Unauthorized') ||
+        error.message.includes('Invalid token') ||
+        error.message.includes('Token expired')
+      )) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setUser(null);
+      }
+      // For network errors, keep the existing session
+      return false;
     }
   }, []);
 
@@ -63,9 +78,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (storedUser && token) {
         try {
           const userData = JSON.parse(storedUser);
+          // Set user immediately from localStorage for instant UI
           setUser(userData);
           
-          // Verify token is still valid in the background
+          // Verify token is still valid in the background (non-blocking)
+          // Don't clear session on network errors, only on actual auth failures
           try {
             const response = await api.getCurrentUser();
             if (response.success && response.data) {
@@ -74,19 +91,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               localStorage.setItem('user', JSON.stringify(updatedUser));
               setUser(updatedUser);
             }
-          } catch (error) {
-            // Token invalid, clear storage
-            console.warn('Token validation failed, clearing session');
-            localStorage.removeItem('user');
-            localStorage.removeItem('token');
-            setUser(null);
+          } catch (error: any) {
+            // Only clear session if it's an actual authentication error
+            // Network errors or temporary issues shouldn't log the user out
+            const errorMsg = error.message || '';
+            const isAuthError = errorMsg.includes('Authentication failed') ||
+                              errorMsg.includes('401') || 
+                              errorMsg.includes('Unauthorized') ||
+                              errorMsg.includes('Invalid token') ||
+                              errorMsg.includes('Token expired') ||
+                              errorMsg.includes('Authentication required') ||
+                              errorMsg.includes('Token required');
+            
+            if (isAuthError) {
+              console.warn('Token validation failed, clearing session');
+              localStorage.removeItem('user');
+              localStorage.removeItem('token');
+              setUser(null);
+            } else {
+              // Network error or other issue - keep the session
+              // User is already set from localStorage, so they stay logged in
+              console.warn('Token validation check failed (network issue?), keeping session:', errorMsg);
+            }
           }
         } catch (error) {
           console.error('Error loading user:', error);
+          // Only clear if JSON parse failed
           localStorage.removeItem('user');
           localStorage.removeItem('token');
           setUser(null);
         }
+      } else {
+        // No stored session
+        setUser(null);
       }
       setIsLoading(false);
     };

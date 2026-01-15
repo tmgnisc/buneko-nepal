@@ -168,12 +168,12 @@ export const getCurrentUser = async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    const [users] = await query(
-      'SELECT id, name, email, role, phone, address, created_at, last_login FROM users WHERE id = ?',
+    const users = await query(
+      'SELECT id, name, email, role, phone, address, profile_image_url, created_at, last_login FROM users WHERE id = ?',
       [userId]
     );
 
-    if (users.length === 0) {
+    if (!Array.isArray(users) || users.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'User not found',

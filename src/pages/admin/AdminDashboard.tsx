@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import ProductsManagement from './ProductsManagement';
 import CategoriesManagement from './CategoriesManagement';
+import AdminProfile from './AdminProfile';
 
 const sidebarLinks = [
   { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
@@ -153,19 +154,6 @@ const ContentManagement = () => (
   </div>
 );
 
-// Admin Profile
-const AdminProfile = () => (
-  <div className="space-y-6">
-    <h1 className="font-serif text-3xl font-bold text-foreground">
-      Admin Profile
-    </h1>
-    <div className="bg-card rounded-2xl p-6 shadow-soft">
-      <p className="text-muted-foreground text-center py-8">
-        Profile settings coming soon!
-      </p>
-    </div>
-  </div>
-);
 
 const AdminDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);

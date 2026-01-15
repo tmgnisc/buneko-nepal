@@ -212,6 +212,30 @@ export const initializeTables = async () => {
       // Continue anyway - tables might exist but query format issue
     }
 
+    // Add profile_image_url column if it doesn't exist (for existing databases)
+    try {
+      const columns = await query(`
+        SELECT COLUMN_NAME 
+        FROM information_schema.COLUMNS 
+        WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'profile_image_url'
+      `, [process.env.DB_NAME || 'EduConnect']);
+      
+      if (!Array.isArray(columns) || columns.length === 0) {
+        await query(`
+          ALTER TABLE users 
+          ADD COLUMN profile_image_url VARCHAR(255) AFTER address
+        `);
+        console.log('  ✓ Added profile_image_url column to users table');
+      }
+    } catch (error) {
+      // Ignore if column already exists
+      if (error.code === 'ER_DUP_FIELDNAME' || error.message.includes('Duplicate column name')) {
+        // Column already exists, that's fine
+      } else {
+        console.warn('⚠️  Could not add profile_image_url column:', error.message);
+      }
+    }
+
     console.log(`✅ Database tables initialized (${createdCount} created, ${skippedCount} already existed)`);
   } catch (error) {
     console.error('❌ Error initializing tables:', error.message);
