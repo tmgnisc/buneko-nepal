@@ -368,6 +368,31 @@ class ApiClient {
       { method: 'GET' }
     );
   }
+
+  async getUserById(id: number) {
+    return this.request<{ user: any }>(`/users/${id}`, {
+      method: 'GET',
+    });
+  }
+
+  async updateUser(id: number, userData: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    role?: string;
+  }) {
+    return this.request<{ user: any }>(`/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData),
+    });
+  }
+
+  async deleteUser(id: number) {
+    return this.request(`/users/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const api = new ApiClient();
