@@ -1,4 +1,5 @@
 import { query, getConnection } from '../config/database.js';
+import { sendEmail } from '../utils/email.js';
 
 // Get all orders (admin only)
 export const getOrders = async (req, res) => {
@@ -134,12 +135,20 @@ export const getOrderById = async (req, res) => {
     const userId = req.user.userId;
     const userRole = req.user.role;
 
-    let sql = 'SELECT * FROM orders WHERE id = ?';
+    let sql = `
+      SELECT 
+        o.*,
+        u.name as user_name,
+        u.email as user_email
+      FROM orders o
+      LEFT JOIN users u ON o.user_id = u.id
+      WHERE o.id = ?
+    `;
     const params = [id];
 
     // Non-admin users can only see their own orders
-    if (userRole !== 'admin') {
-      sql += ' AND user_id = ?';
+    if (userRole !== 'admin' && userRole !== 'superadmin') {
+      sql += ' AND o.user_id = ?';
       params.push(userId);
     }
 
@@ -312,31 +321,155 @@ export const updateOrderStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    // Check if order exists
-    const [existingOrders] = await query(
-      'SELECT id FROM orders WHERE id = ?',
+    // Get order with user info
+    const orders = await query(
+      `SELECT o.*, u.name as user_name, u.email as user_email 
+       FROM orders o 
+       LEFT JOIN users u ON o.user_id = u.id 
+       WHERE o.id = ?`,
       [id]
     );
 
-    if (existingOrders.length === 0) {
+    if (orders.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Order not found',
       });
     }
 
+    const order = orders[0];
+    const oldStatus = order.status;
+
+    // Update order status
     await query(
       'UPDATE orders SET status = ?, updated_at = NOW() WHERE id = ?',
       [status, id]
     );
 
-    const orders = await query('SELECT * FROM orders WHERE id = ?', [id]);
+    // Get updated order
+    const updatedOrders = await query('SELECT * FROM orders WHERE id = ?', [id]);
+    const updatedOrder = updatedOrders[0];
+
+    // Send email notification to customer if status changed
+    if (oldStatus !== status && order.user_email) {
+      try {
+        const statusMessages = {
+          pending: {
+            subject: 'Order Confirmed - Buneko Blooms',
+            title: 'Order Confirmed',
+            message: 'Your order has been confirmed and is being prepared.',
+            color: '#ffc107',
+          },
+          processing: {
+            subject: 'Order Processing - Buneko Blooms',
+            title: 'Order Processing',
+            message: 'Your order is now being processed and will be ready soon.',
+            color: '#2196f3',
+          },
+          shipped: {
+            subject: 'Order Shipped - Buneko Blooms',
+            title: 'Order Shipped',
+            message: 'Great news! Your order has been shipped and is on its way to you.',
+            color: '#673ab7',
+          },
+          delivered: {
+            subject: 'Order Delivered - Buneko Blooms',
+            title: 'Order Delivered',
+            message: 'Your order has been successfully delivered! Thank you for shopping with us.',
+            color: '#4caf50',
+          },
+          cancelled: {
+            subject: 'Order Cancelled - Buneko Blooms',
+            title: 'Order Cancelled',
+            message: 'Your order has been cancelled. If you have any questions, please contact our support team.',
+            color: '#f44336',
+          },
+        };
+
+        const statusInfo = statusMessages[status] || statusMessages.pending;
+
+        const html = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>${statusInfo.title}</title>
+          </head>
+          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+              <h1 style="color: ${statusInfo.color}; margin-top: 0;">${statusInfo.title}</h1>
+            </div>
+            
+            <div style="background-color: #fff; padding: 20px; border-radius: 10px; border: 1px solid #e0e0e0;">
+              <p>Dear ${order.user_name || 'Customer'},</p>
+              
+              <p>${statusInfo.message}</p>
+              
+              <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <p style="margin: 0;"><strong>Order ID:</strong> #${order.id}</p>
+                <p style="margin: 5px 0 0 0;"><strong>Order Status:</strong> <span style="text-transform: capitalize;">${status}</span></p>
+                <p style="margin: 5px 0 0 0;"><strong>Total Amount:</strong> NPR ${Number(order.total_amount).toFixed(2)}</p>
+              </div>
+              
+              <p>You can track your order status anytime by logging into your account.</p>
+              
+              <p>If you have any questions or concerns, please don't hesitate to contact our customer support team.</p>
+              
+              <p style="margin-top: 30px;">
+                Best regards,<br>
+                <strong>Buneko Blooms Team</strong>
+              </p>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px; color: #666; font-size: 12px;">
+              <p>This is an automated message. Please do not reply to this email.</p>
+            </div>
+          </body>
+          </html>
+        `;
+
+        const text = `
+          ${statusInfo.title} - Buneko Blooms
+          
+          Dear ${order.user_name || 'Customer'},
+          
+          ${statusInfo.message}
+          
+          Order ID: #${order.id}
+          Order Status: ${status}
+          Total Amount: NPR ${Number(order.total_amount).toFixed(2)}
+          
+          You can track your order status anytime by logging into your account.
+          
+          If you have any questions or concerns, please don't hesitate to contact our customer support team.
+          
+          Best regards,
+          Buneko Blooms Team
+          
+          ---
+          This is an automated message. Please do not reply to this email.
+        `;
+
+        await sendEmail({
+          to: order.user_email,
+          subject: statusInfo.subject,
+          html,
+          text,
+        });
+
+        console.log(`✅ Order status email sent to ${order.user_email} for order #${id}`);
+      } catch (emailError) {
+        // Log email error but don't fail the status update
+        console.error('Error sending order status email:', emailError);
+      }
+    }
 
     res.json({
       success: true,
       message: 'Order status updated successfully',
       data: {
-        order: orders[0],
+        order: updatedOrder,
       },
     });
   } catch (error) {

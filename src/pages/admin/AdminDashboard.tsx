@@ -125,11 +125,12 @@ const AdminOverview = () => (
 
 // Orders Management (dynamic)
 const OrdersManagement = () => {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [updatingId, setUpdatingId] = useState<number | null>(null);
-  const navigate = useNavigate();
+  const [exporting, setExporting] = useState(false);
 
   const loadOrders = async () => {
     try {
@@ -188,6 +189,72 @@ const OrdersManagement = () => {
   const formatDate = (value: string) =>
     value ? new Date(value).toLocaleString() : '';
 
+  const handleExport = () => {
+    if (!orders || orders.length === 0) {
+      toast.error('No orders to export');
+      return;
+    }
+    try {
+      setExporting(true);
+      const header = [
+        'Order ID',
+        'Customer Name',
+        'Customer Email',
+        'Phone',
+        'Total Amount',
+        'Payment Status',
+        'Order Status',
+        'Created At',
+        'Items',
+      ];
+      const rows = orders.map((order) => {
+        const itemsSummary =
+          order.items && order.items.length > 0
+            ? order.items
+                .map(
+                  (item: any) =>
+                    `${(item.product_name || `Product #${item.product_id}`)
+                      .toString()
+                      .replace(/"/g, '""')} x ${item.quantity}`
+                )
+                .join(' | ')
+            : '';
+        const values = [
+          order.id,
+          (order.user_name || '').toString().replace(/"/g, '""'),
+          (order.user_email || '').toString().replace(/"/g, '""'),
+          (order.phone || '').toString().replace(/"/g, '""'),
+          order.total_amount,
+          order.payment_status || 'pending',
+          order.status,
+          order.created_at,
+          itemsSummary,
+        ];
+        return values
+          .map((val) => `"${val !== undefined && val !== null ? val : ''}"`)
+          .join(',');
+      });
+      const csvContent = [header.join(','), ...rows].join('\n');
+      const blob = new Blob([csvContent], {
+        type: 'text/csv;charset=utf-8;',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'orders-report.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Orders report downloaded');
+    } catch (error) {
+      console.error('Error exporting orders:', error);
+      toast.error('Failed to export orders');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
@@ -213,6 +280,14 @@ const OrdersManagement = () => {
             <option value="delivered">Delivered</option>
             <option value="cancelled">Cancelled</option>
           </select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={loading || exporting || orders.length === 0}
+          >
+            {exporting ? 'Exporting...' : 'Download Excel Report'}
+          </Button>
         </div>
       </div>
 
@@ -806,6 +881,7 @@ const AdminDashboard = () => {
               <Route path="categories" element={<CategoriesManagement />} />
               <Route path="products" element={<ProductsManagement />} />
               <Route path="orders" element={<OrdersManagement />} />
+              <Route path="orders/:id" element={<OrderDetails />} />
               <Route path="customers" element={<CustomersManagement />} />
               <Route path="content" element={<ContentManagement />} />
               <Route path="profile" element={<AdminProfile />} />
