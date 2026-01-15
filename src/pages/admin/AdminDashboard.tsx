@@ -25,6 +25,8 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { MapContainer, TileLayer, Marker } from 'react-leaflet';
+import L from 'leaflet';
 import ProductsManagement from './ProductsManagement';
 import CategoriesManagement from './CategoriesManagement';
 import AdminProfile from './AdminProfile';
@@ -442,6 +444,19 @@ const OrdersManagement = () => {
   );
 };
 
+// Marker icon for Leaflet
+const orderMarkerIcon = new L.Icon({
+  iconUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  iconRetinaUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  shadowUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  shadowSize: [41, 41],
+});
+
 // Single Order Details (with map & delivery info)
 const OrderDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -502,9 +517,13 @@ const OrderDetails = () => {
     order?.longitude !== null &&
     order?.longitude !== undefined;
 
+  // Convert latitude/longitude to numbers (they come as strings from DB)
+  const latNum = hasLocation ? Number(order.latitude) : null;
+  const lngNum = hasLocation ? Number(order.longitude) : null;
+
   const distanceKm =
-    hasLocation && typeof order.latitude === 'number' && typeof order.longitude === 'number'
-      ? haversineDistanceKm(STORE_LAT, STORE_LNG, order.latitude, order.longitude)
+    hasLocation && latNum !== null && lngNum !== null && !isNaN(latNum) && !isNaN(lngNum)
+      ? haversineDistanceKm(STORE_LAT, STORE_LNG, latNum, lngNum)
       : null;
 
   // Simple delivery charge model for COD: base + per km
@@ -520,8 +539,8 @@ const OrderDetails = () => {
     order?.payment_status === 'paid' ? 'Online Card (Stripe)' : 'Cash on Delivery (COD)';
 
   const openInGoogleMaps = () => {
-    if (!hasLocation) return;
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${order.latitude},${order.longitude}`;
+    if (!hasLocation || latNum === null || lngNum === null || isNaN(latNum) || isNaN(lngNum)) return;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${latNum},${lngNum}`;
     window.open(url, '_blank');
   };
 
@@ -734,21 +753,28 @@ const OrderDetails = () => {
             ) : (
               <>
                 <div className="w-full h-56 rounded-xl overflow-hidden border border-border">
-                  {/* Simple embedded map via Google Maps, since admin map is for viewing only */}
-                  <iframe
-                    title="Order location"
-                    width="100%"
-                    height="100%"
-                    style={{ border: 0 }}
-                    loading="lazy"
-                    src={`https://www.google.com/maps/embed/v1/view?key=${
-                      import.meta.env.VITE_GOOGLE_MAPS_EMBED_KEY || ''
-                    }&center=${order.latitude},${order.longitude}&zoom=15`}
-                  />
+                  {latNum !== null && lngNum !== null && !isNaN(latNum) && !isNaN(lngNum) ? (
+                    <MapContainer
+                      center={[latNum, lngNum]}
+                      zoom={15}
+                      style={{ height: '100%', width: '100%' }}
+                      scrollWheelZoom={false}
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      <Marker position={[latNum, lngNum]} icon={orderMarkerIcon} />
+                    </MapContainer>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+                      Invalid coordinates
+                    </div>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Coordinates: {order.latitude?.toFixed(5)},{' '}
-                  {order.longitude?.toFixed(5)}
+                  Coordinates: {latNum !== null && !isNaN(latNum) ? latNum.toFixed(5) : 'N/A'},{' '}
+                  {lngNum !== null && !isNaN(lngNum) ? lngNum.toFixed(5) : 'N/A'}
                 </p>
               </>
             )}
