@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import {
+  Routes,
+  Route,
+  Link,
+  useLocation,
+  useNavigate,
+  useParams,
+} from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard,
@@ -122,6 +129,7 @@ const OrdersManagement = () => {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const navigate = useNavigate();
 
   const loadOrders = async () => {
     try {
@@ -237,7 +245,8 @@ const OrdersManagement = () => {
                 {orders.map((order) => (
                   <tr
                     key={order.id}
-                    className="border-b border-border last:border-0 align-top"
+                    className="border-b border-border last:border-0 align-top hover:bg-secondary/40 cursor-pointer"
+                    onClick={() => navigate(`/admin/orders/${order.id}`)}
                   >
                     <td className="py-3 pr-4 font-medium text-foreground">
                       #{order.id}
@@ -320,7 +329,10 @@ const OrdersManagement = () => {
                         </span>
                       )}
                     </td>
-                    <td className="py-3 pr-0 text-right">
+                    <td
+                      className="py-3 pr-0 text-right"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <select
                         value={order.status}
                         disabled={updatingId === order.id}
@@ -350,6 +362,323 @@ const OrdersManagement = () => {
             </table>
           </div>
         )}
+      </div>
+    </div>
+  );
+};
+
+// Single Order Details (with map & delivery info)
+const OrderDetails = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [order, setOrder] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Store location (for distance calc) - using Kathmandu center as example
+  const STORE_LAT = 27.7172;
+  const STORE_LNG = 85.324;
+
+  useEffect(() => {
+    const loadOrder = async () => {
+      if (!id) return;
+      try {
+        setLoading(true);
+        const res = await api.getOrderById(Number(id));
+        if (res.success && res.data) {
+          setOrder(res.data.order);
+        } else {
+          toast.error(res.message || 'Order not found');
+          navigate('/admin/orders', { replace: true });
+        }
+      } catch (error: any) {
+        console.error('Error loading order:', error);
+        toast.error(error.message || 'Failed to load order');
+        navigate('/admin/orders', { replace: true });
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadOrder();
+  }, [id, navigate]);
+
+  const haversineDistanceKm = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ) => {
+    const toRad = (v: number) => (v * Math.PI) / 180;
+    const R = 6371; // km
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  const hasLocation =
+    order?.latitude !== null &&
+    order?.latitude !== undefined &&
+    order?.longitude !== null &&
+    order?.longitude !== undefined;
+
+  const distanceKm =
+    hasLocation && typeof order.latitude === 'number' && typeof order.longitude === 'number'
+      ? haversineDistanceKm(STORE_LAT, STORE_LNG, order.latitude, order.longitude)
+      : null;
+
+  // Simple delivery charge model for COD: base + per km
+  const BASE_DELIVERY_FARE = 50; // NPR
+  const PER_KM_FARE = 10; // NPR per km
+
+  const deliveryCharge =
+    order?.payment_status !== 'paid' && distanceKm !== null
+      ? Math.round(BASE_DELIVERY_FARE + PER_KM_FARE * distanceKm)
+      : 0;
+
+  const paymentMethod =
+    order?.payment_status === 'paid' ? 'Online Card (Stripe)' : 'Cash on Delivery (COD)';
+
+  const openInGoogleMaps = () => {
+    if (!hasLocation) return;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${order.latitude},${order.longitude}`;
+    window.open(url, '_blank');
+  };
+
+  const formatAmount = (value: any) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? `NPR ${n.toFixed(2)}` : `NPR ${value}`;
+  };
+
+  const formatDateTime = (value: string) =>
+    value ? new Date(value).toLocaleString() : '';
+
+  if (loading || !order) {
+    return (
+      <div className="space-y-6">
+        <Button variant="ghost" onClick={() => navigate(-1)}>
+          ← Back to Orders
+        </Button>
+        <div className="bg-card rounded-2xl p-6 shadow-soft">
+          <p className="text-muted-foreground text-center py-8">
+            Loading order details...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="font-serif text-3xl font-bold text-foreground">
+            Order #{order.id}
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Detailed view with customer info, payment, and delivery location.
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => navigate('/admin/orders')}>
+          Back to Orders
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: basic info */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="bg-card rounded-2xl p-5 shadow-soft space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  Placed on {formatDateTime(order.created_at)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Last updated {formatDateTime(order.updated_at)}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
+                    order.status === 'delivered'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : order.status === 'cancelled'
+                      ? 'bg-destructive/10 text-destructive'
+                      : order.status === 'processing'
+                      ? 'bg-sky-100 text-sky-700'
+                      : order.status === 'shipped'
+                      ? 'bg-indigo-100 text-indigo-700'
+                      : 'bg-amber-100 text-amber-700'
+                  }`}
+                >
+                  Status: {order.status}
+                </span>
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    order.payment_status === 'paid'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : order.payment_status === 'failed'
+                      ? 'bg-destructive/10 text-destructive'
+                      : 'bg-amber-100 text-amber-700'
+                  }`}
+                >
+                  Payment: {order.payment_status || 'pending'} ({paymentMethod})
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <h2 className="font-semibold text-foreground mb-2">
+                  Customer
+                </h2>
+                <p className="text-sm font-medium">
+                  {order.user_name || 'Unknown'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {order.user_email}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {order.phone}
+                </p>
+              </div>
+              <div>
+                <h2 className="font-semibold text-foreground mb-2">
+                  Shipping Address
+                </h2>
+                <p className="text-xs text-muted-foreground whitespace-pre-line">
+                  {order.shipping_address}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-card rounded-2xl p-5 shadow-soft space-y-4">
+            <h2 className="font-serif text-xl font-semibold text-foreground">
+              Items
+            </h2>
+            {order.items && order.items.length > 0 ? (
+              <div className="space-y-2 text-sm">
+                {order.items.map((item: any) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between border-b border-border last:border-0 py-2"
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        {item.product_name || `Product #${item.product_id}`}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Qty: {item.quantity}
+                      </span>
+                    </div>
+                    <div className="text-right text-xs text-muted-foreground">
+                      <div>{formatAmount(item.subtotal)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No items found for this order.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Right: totals & map */}
+        <div className="space-y-4">
+          <div className="bg-card rounded-2xl p-5 shadow-soft space-y-2 text-sm">
+            <h2 className="font-serif text-xl font-semibold text-foreground mb-2">
+              Payment Summary
+            </h2>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Order total</span>
+              <span className="font-semibold text-foreground">
+                {formatAmount(order.total_amount)}
+              </span>
+            </div>
+            {order.payment_status !== 'paid' && distanceKm !== null && (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">
+                    Distance from store
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {distanceKm.toFixed(2)} km
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">
+                    Estimated delivery charge
+                  </span>
+                  <span className="font-semibold text-foreground">
+                    {formatAmount(deliveryCharge)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pt-1 border-t border-border mt-1">
+                  <span className="text-muted-foreground">Total COD amount</span>
+                  <span className="font-semibold text-primary">
+                    {formatAmount(
+                      Number(order.total_amount) + (deliveryCharge || 0)
+                    )}
+                  </span>
+                </div>
+              </>
+            )}
+            {order.payment_status === 'paid' && (
+              <p className="text-xs text-emerald-600 mt-2">
+                Payment received via Stripe. No additional COD charge.
+              </p>
+            )}
+          </div>
+
+          <div className="bg-card rounded-2xl p-5 shadow-soft space-y-3 text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-serif text-xl font-semibold text-foreground">
+                Delivery Location
+              </h2>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!hasLocation}
+                onClick={openInGoogleMaps}
+              >
+                Get Directions
+              </Button>
+            </div>
+            {!hasLocation ? (
+              <p className="text-xs text-muted-foreground">
+                No location selected for this order.
+              </p>
+            ) : (
+              <>
+                <div className="w-full h-56 rounded-xl overflow-hidden border border-border">
+                  {/* Simple embedded map via Google Maps, since admin map is for viewing only */}
+                  <iframe
+                    title="Order location"
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0 }}
+                    loading="lazy"
+                    src={`https://www.google.com/maps/embed/v1/view?key=${
+                      import.meta.env.VITE_GOOGLE_MAPS_EMBED_KEY || ''
+                    }&center=${order.latitude},${order.longitude}&zoom=15`}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Coordinates: {order.latitude?.toFixed(5)},{' '}
+                  {order.longitude?.toFixed(5)}
+                </p>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

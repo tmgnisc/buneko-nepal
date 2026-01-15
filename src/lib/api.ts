@@ -270,6 +270,12 @@ class ApiClient {
     });
   }
 
+  async getOrderById(id: number) {
+    return this.request<{ order: any }>(`/orders/${id}`, {
+      method: 'GET',
+    });
+  }
+
   async getOrders(params?: { page?: number; limit?: number; status?: string }) {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());

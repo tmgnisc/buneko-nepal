@@ -13,9 +13,12 @@ export const getOrders = async (req, res) => {
         u.name as user_name,
         u.email as user_email,
         o.total_amount,
+        o.payment_status,
         o.status,
         o.shipping_address,
         o.phone,
+        o.latitude,
+        o.longitude,
         o.created_at,
         o.updated_at
       FROM orders o
