@@ -61,6 +61,8 @@ const ProductsManagement = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -172,6 +174,7 @@ const ProductsManagement = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       const productPayload = {
         name: formData.name,
@@ -196,12 +199,15 @@ const ProductsManagement = () => {
     } catch (error: any) {
       console.error('Error saving product:', error);
       toast.error(error.message || 'Failed to save product');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleDelete = async () => {
     if (!deleteProductId) return;
 
+    setIsDeleting(true);
     try {
       await api.deleteProduct(deleteProductId);
       toast.success('Product deleted successfully');
@@ -211,6 +217,8 @@ const ProductsManagement = () => {
     } catch (error: any) {
       console.error('Error deleting product:', error);
       toast.error(error.message || 'Failed to delete product');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -305,6 +313,7 @@ const ProductsManagement = () => {
                     size="sm"
                     className="flex-1"
                     onClick={() => handleOpenDialog(product)}
+                    disabled={loading}
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Edit
@@ -314,6 +323,7 @@ const ProductsManagement = () => {
                     size="sm"
                     className="flex-1"
                     onClick={() => handleDeleteClick(product.id)}
+                    disabled={loading}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete
@@ -381,6 +391,7 @@ const ProductsManagement = () => {
                 placeholder="Enter product name"
                 className="mt-2 rounded-xl"
                 required
+                disabled={isSubmitting}
               />
             </div>
 
@@ -396,6 +407,7 @@ const ProductsManagement = () => {
                 placeholder="Enter product description"
                 className="mt-2 rounded-xl min-h-[100px]"
                 required
+                disabled={isSubmitting}
               />
             </div>
 
@@ -415,6 +427,7 @@ const ProductsManagement = () => {
                   placeholder="0.00"
                   className="mt-2 rounded-xl"
                   required
+                  disabled={isSubmitting}
                 />
               </div>
               <div>
@@ -429,6 +442,7 @@ const ProductsManagement = () => {
                   }
                   placeholder="0"
                   className="mt-2 rounded-xl"
+                  disabled={isSubmitting}
                 />
               </div>
             </div>
@@ -441,16 +455,17 @@ const ProductsManagement = () => {
                   No categories available. Please create a category first.
                 </div>
               ) : (
-                <Select
-                  value={formData.category_id}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, category_id: value })
-                  }
-                  required
-                >
-                  <SelectTrigger className="mt-2 rounded-xl">
-                    <SelectValue placeholder="Select a category" />
-                  </SelectTrigger>
+              <Select
+                value={formData.category_id}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, category_id: value })
+                }
+                required
+                disabled={isSubmitting}
+              >
+                <SelectTrigger className="mt-2 rounded-xl" disabled={isSubmitting}>
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
                   <SelectContent>
                     {categories.map((category) => (
                       <SelectItem key={category.id} value={category.id.toString()}>
@@ -467,11 +482,19 @@ const ProductsManagement = () => {
                 type="button"
                 variant="outline"
                 onClick={handleCloseDialog}
+                disabled={isSubmitting}
               >
                 Cancel
               </Button>
-              <Button type="submit">
-                {selectedProduct ? 'Update Product' : 'Create Product'}
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    {selectedProduct ? 'Updating...' : 'Creating...'}
+                  </>
+                ) : (
+                  selectedProduct ? 'Update Product' : 'Create Product'
+                )}
               </Button>
             </DialogFooter>
           </form>
@@ -489,9 +512,20 @@ const ProductsManagement = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive">
-              Delete
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              className="bg-destructive"
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

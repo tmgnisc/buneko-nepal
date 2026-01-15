@@ -216,7 +216,14 @@ const Signup = () => {
               className="w-full" 
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Creating account...' : 'Create Account'}
+              {isSubmitting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
+                  Creating account...
+                </>
+              ) : (
+                'Create Account'
+              )}
             </Button>
           </form>
 

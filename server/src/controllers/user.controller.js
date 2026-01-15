@@ -1,4 +1,6 @@
 import { query } from '../config/database.js';
+import bcrypt from 'bcryptjs';
+import { deleteImage, extractPublicId } from '../utils/cloudinary.js';
 
 // Get all users (admin only)
 export const getUsers = async (req, res) => {
@@ -92,7 +94,15 @@ export const getUserById = async (req, res) => {
 export const updateProfile = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { name, email, phone, address } = req.body;
+    const { name, email, phone, address, profile_image_url } = req.body;
+
+    // Get current user to check for existing profile image
+    const currentUsers = await query(
+      'SELECT profile_image_url FROM users WHERE id = ?',
+      [userId]
+    );
+    const currentUser = Array.isArray(currentUsers) && currentUsers.length > 0 ? currentUsers[0] : null;
+    const oldImageUrl = currentUser?.profile_image_url;
 
     // Build update query dynamically
     const updates = [];
@@ -104,11 +114,11 @@ export const updateProfile = async (req, res) => {
     }
     if (email) {
       // Check if email is already taken by another user
-      const [existingUsers] = await query(
+      const existingUsers = await query(
         'SELECT id FROM users WHERE email = ? AND id != ?',
         [email, userId]
       );
-      if (existingUsers.length > 0) {
+      if (Array.isArray(existingUsers) && existingUsers.length > 0) {
         return res.status(400).json({
           success: false,
           message: 'Email is already taken',
@@ -124,6 +134,17 @@ export const updateProfile = async (req, res) => {
     if (address) {
       updates.push('address = ?');
       params.push(address);
+    }
+    if (profile_image_url) {
+      // If new image is uploaded and old image exists, delete old image from Cloudinary
+      if (oldImageUrl && profile_image_url !== oldImageUrl) {
+        const oldPublicId = extractPublicId(oldImageUrl);
+        if (oldPublicId) {
+          await deleteImage(oldPublicId);
+        }
+      }
+      updates.push('profile_image_url = ?');
+      params.push(profile_image_url);
     }
 
     if (updates.length === 0) {
@@ -141,23 +162,26 @@ export const updateProfile = async (req, res) => {
       params
     );
 
-    const [users] = await query(
-      'SELECT id, name, email, role, phone, address, created_at FROM users WHERE id = ?',
+    const users = await query(
+      'SELECT id, name, email, role, phone, address, profile_image_url, created_at FROM users WHERE id = ?',
       [userId]
     );
+
+    const user = Array.isArray(users) && users.length > 0 ? users[0] : null;
 
     res.json({
       success: true,
       message: 'Profile updated successfully',
       data: {
-        user: users[0],
+        user,
       },
     });
   } catch (error) {
     console.error('Update profile error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error updating profile',
+      message: error.message || 'Error updating profile',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 };
@@ -249,6 +273,73 @@ export const updateUser = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error updating user',
+    });
+  }
+};
+
+// Change password
+export const changePassword = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password and new password are required',
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters long',
+      });
+    }
+
+    // Get current user password
+    const users = await query(
+      'SELECT password FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (!Array.isArray(users) || users.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    const user = users[0];
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isPasswordValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password is incorrect',
+      });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    await query(
+      'UPDATE users SET password = ?, updated_at = NOW() WHERE id = ?',
+      [hashedPassword, userId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Password changed successfully',
+    });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error changing password',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 };

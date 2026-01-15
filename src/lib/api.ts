@@ -281,6 +281,58 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // User/Profile endpoints
+  async updateProfile(profileData: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    profile_image?: File;
+    profile_image_url?: string;
+  }) {
+    const formData = new FormData();
+    if (profileData.name) formData.append('name', profileData.name);
+    if (profileData.email) formData.append('email', profileData.email);
+    if (profileData.phone) formData.append('phone', profileData.phone);
+    if (profileData.address) formData.append('address', profileData.address);
+    if (profileData.profile_image) {
+      formData.append('profile_image', profileData.profile_image);
+    } else if (profileData.profile_image_url) {
+      formData.append('profile_image_url', profileData.profile_image_url);
+    }
+
+    const token = this.getAuthToken();
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/users/profile`, {
+      method: 'PUT',
+      headers,
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      if (data.errors && Array.isArray(data.errors)) {
+        const errorMessages = data.errors.map((err: any) => err.msg || err.message).join(', ');
+        throw new Error(errorMessages || data.message || 'Validation failed');
+      }
+      throw new Error(data.message || 'Failed to update profile');
+    }
+
+    return data;
+  }
+
+  async changePassword(currentPassword: string, newPassword: string) {
+    return this.request('/users/profile/password', {
+      method: 'PUT',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+  }
 }
 
 export const api = new ApiClient();

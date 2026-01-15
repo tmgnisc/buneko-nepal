@@ -154,7 +154,14 @@ const Login = () => {
               className="w-full" 
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Signing in...' : 'Sign In'}
+              {isSubmitting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
+                  Signing in...
+                </>
+              ) : (
+                'Sign In'
+              )}
             </Button>
           </form>
 

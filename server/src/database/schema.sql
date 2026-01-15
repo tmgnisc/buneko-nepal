@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   role ENUM('customer', 'admin', 'superadmin') DEFAULT 'customer',
   phone VARCHAR(20),
   address TEXT,
+  profile_image_url VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   last_login TIMESTAMP NULL,

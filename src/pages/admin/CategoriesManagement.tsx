@@ -45,6 +45,8 @@ interface Category {
 const CategoriesManagement = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -118,6 +120,7 @@ const CategoriesManagement = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       const categoryPayload = {
         name: formData.name,
@@ -138,12 +141,15 @@ const CategoriesManagement = () => {
     } catch (error: any) {
       console.error('Error saving category:', error);
       toast.error(error.message || 'Failed to save category');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleDelete = async () => {
     if (!deleteCategoryId) return;
 
+    setIsDeleting(true);
     try {
       await api.deleteCategory(deleteCategoryId);
       toast.success('Category deleted successfully');
@@ -153,6 +159,8 @@ const CategoriesManagement = () => {
     } catch (error: any) {
       console.error('Error deleting category:', error);
       toast.error(error.message || 'Failed to delete category');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -172,7 +180,7 @@ const CategoriesManagement = () => {
             Create and manage product categories
           </p>
         </div>
-        <Button onClick={() => handleOpenDialog()}>
+        <Button onClick={() => handleOpenDialog()} disabled={loading}>
           <Plus className="h-4 w-4 mr-2" />
           Add Category
         </Button>
@@ -223,6 +231,7 @@ const CategoriesManagement = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => handleOpenDialog(category)}
+                      disabled={loading}
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -230,7 +239,7 @@ const CategoriesManagement = () => {
                       variant="destructive"
                       size="sm"
                       onClick={() => handleDeleteClick(category.id)}
-                      disabled={category.product_count > 0}
+                      disabled={category.product_count > 0 || loading}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -286,6 +295,7 @@ const CategoriesManagement = () => {
                 placeholder="Enter category name"
                 className="mt-2 rounded-xl"
                 required
+                disabled={isSubmitting}
               />
             </div>
 
@@ -300,6 +310,7 @@ const CategoriesManagement = () => {
                 }
                 placeholder="Enter category description (optional)"
                 className="mt-2 rounded-xl min-h-[100px]"
+                disabled={isSubmitting}
               />
             </div>
 
@@ -315,6 +326,7 @@ const CategoriesManagement = () => {
                 }
                 placeholder="https://example.com/image.jpg (optional)"
                 className="mt-2 rounded-xl"
+                disabled={isSubmitting}
               />
             </div>
 
@@ -323,11 +335,19 @@ const CategoriesManagement = () => {
                 type="button"
                 variant="outline"
                 onClick={handleCloseDialog}
+                disabled={isSubmitting}
               >
                 Cancel
               </Button>
-              <Button type="submit">
-                {selectedCategory ? 'Update Category' : 'Create Category'}
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    {selectedCategory ? 'Updating...' : 'Creating...'}
+                  </>
+                ) : (
+                  selectedCategory ? 'Update Category' : 'Create Category'
+                )}
               </Button>
             </DialogFooter>
           </form>
@@ -345,9 +365,20 @@ const CategoriesManagement = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive">
-              Delete
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              className="bg-destructive"
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

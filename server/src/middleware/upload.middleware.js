@@ -30,15 +30,22 @@ export const uploadToCloudinary = async (req, res, next) => {
       return next();
     }
 
+    // Determine folder based on field name or route
+    const folder = req.file.fieldname === 'profile_image' ? 'profiles' : 'products';
+
     // Upload to Cloudinary
     const result = await uploadImage(
       req.file.buffer,
-      'products',
+      folder,
       null
     );
 
-    // Attach image URL to request body
-    req.body.image_url = result.url;
+    // Attach image URL to request body based on field name
+    if (req.file.fieldname === 'profile_image') {
+      req.body.profile_image_url = result.url;
+    } else {
+      req.body.image_url = result.url;
+    }
     req.body.image_public_id = result.public_id;
 
     next();
