@@ -126,6 +126,8 @@ export const initializeTables = async () => {
           status ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled') DEFAULT 'pending',
           shipping_address TEXT NOT NULL,
           phone VARCHAR(20) NOT NULL,
+          latitude DECIMAL(10, 8) NULL,
+          longitude DECIMAL(11, 8) NULL,
           notes TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

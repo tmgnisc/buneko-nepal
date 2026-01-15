@@ -71,10 +71,16 @@ export const Navbar = () => {
             )}
             {isAuthenticated ? (
               <>
-                <Link to={user?.role === 'admin' || user?.role === 'superadmin' ? '/admin' : '/dashboard'}>
-                  <Button variant="ghost" size="sm">
-                    <User className="h-4 w-4 mr-2" />
-                    Dashboard
+                <Link
+                  to={user?.role === 'admin' || user?.role === 'superadmin' ? '/admin' : '/dashboard'}
+                >
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 rounded-full flex items-center justify-center"
+                    title="Open dashboard"
+                  >
+                    <User className="h-4 w-4" />
                   </Button>
                 </Link>
                 <Button variant="outline" size="sm" onClick={logout}>

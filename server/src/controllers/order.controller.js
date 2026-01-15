@@ -191,7 +191,7 @@ export const createOrder = async (req, res) => {
     await connection.beginTransaction();
 
     const userId = req.user.userId;
-    const { items, shipping_address, phone, notes } = req.body;
+    const { items, shipping_address, phone, notes, latitude, longitude } = req.body;
 
     // Calculate total and validate products
     let totalAmount = 0;
@@ -225,9 +225,9 @@ export const createOrder = async (req, res) => {
 
     // Create order
     const [orderResult] = await query(
-      `INSERT INTO orders (user_id, total_amount, status, shipping_address, phone, notes)
-       VALUES (?, ?, 'pending', ?, ?, ?)`,
-      [userId, totalAmount, shipping_address, phone, notes || null]
+      `INSERT INTO orders (user_id, total_amount, status, shipping_address, phone, latitude, longitude, notes)
+       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?)`,
+      [userId, totalAmount, shipping_address, phone, latitude || null, longitude || null, notes || null]
     );
 
     const orderId = orderResult.insertId;

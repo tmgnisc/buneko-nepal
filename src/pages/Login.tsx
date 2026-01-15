@@ -47,7 +47,8 @@ const Login = () => {
         if (userData?.role === 'superadmin' || userData?.role === 'admin') {
           navigate('/admin', { replace: true });
         } else {
-          navigate('/dashboard', { replace: true });
+          // Regular customers go to home; they can enter dashboard via navbar/profile icon
+          navigate('/', { replace: true });
         }
       }, 100);
     } catch (error: any) {

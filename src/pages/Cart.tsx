@@ -5,6 +5,33 @@ import { Button } from '@/components/ui/button';
 import { ShoppingBag, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+
+const markerIcon = new L.Icon({
+  iconUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  iconRetinaUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  shadowUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  shadowSize: [41, 41],
+});
+
+interface LocationSelectorProps {
+  onChange: (lat: number, lng: number) => void;
+}
+
+const LocationSelector = ({ onChange }: LocationSelectorProps) => {
+  useMapEvents({
+    click(e) {
+      onChange(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+};
 
 const CartPage = () => {
   const { items, totalItems, totalPrice, updateQuantity, removeFromCart, clearCart } = useCart();
@@ -13,6 +40,8 @@ const CartPage = () => {
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
 
   const formattedTotal = Number.isFinite(totalPrice)
     ? `NPR ${totalPrice.toFixed(2)}`
@@ -32,6 +61,8 @@ const CartPage = () => {
         items: buildOrderItems(),
         shipping_address: shippingAddress.trim(),
         phone: phone.trim(),
+        latitude: latitude ?? undefined,
+        longitude: longitude ?? undefined,
         notes: notes.trim() || undefined,
       });
       toast.success('Order placed successfully (Cash on Delivery).');
@@ -196,8 +227,8 @@ const CartPage = () => {
                     </label>
                   </div>
                 </div>
-                {/* Shipping form */}
-                <div className="space-y-2">
+                {/* Shipping form + map */}
+                <div className="space-y-3">
                   <p className="text-sm font-medium text-foreground">Shipping details</p>
                   <textarea
                     className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
@@ -217,6 +248,39 @@ const CartPage = () => {
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                   />
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      Tap on the map to set your delivery location. This will be sent to the
+                      admin with your order.
+                    </p>
+                    <div className="w-full h-64 rounded-xl overflow-hidden border border-border">
+                      <MapContainer
+                        center={[27.7172, 85.3240]}
+                        zoom={13}
+                        style={{ height: '100%', width: '100%' }}
+                        scrollWheelZoom={false}
+                      >
+                        <TileLayer
+                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
+                        <LocationSelector
+                          onChange={(lat, lng) => {
+                            setLatitude(lat);
+                            setLongitude(lng);
+                          }}
+                        />
+                        {latitude !== null && longitude !== null && (
+                          <Marker position={[latitude, longitude]} icon={markerIcon} />
+                        )}
+                      </MapContainer>
+                    </div>
+                    {latitude !== null && longitude !== null && (
+                      <p className="text-xs text-muted-foreground">
+                        Selected location: {latitude.toFixed(5)}, {longitude.toFixed(5)}
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm text-muted-foreground">Items</span>

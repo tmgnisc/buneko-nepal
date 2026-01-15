@@ -273,6 +273,26 @@ class ApiClient {
     });
   }
 
+  // Wishlist endpoints
+  async getWishlist() {
+    return this.request<{ items: any[] }>('/wishlist', {
+      method: 'GET',
+    });
+  }
+
+  async addToWishlist(productId: number) {
+    return this.request('/wishlist', {
+      method: 'POST',
+      body: JSON.stringify({ product_id: productId }),
+    });
+  }
+
+  async removeFromWishlist(productId: number) {
+    return this.request(`/wishlist/${productId}`, {
+      method: 'DELETE',
+    });
+  }
+
   async createCheckoutSession(payload: {
     items: Array<{ product_id: number; quantity: number }>;
     successUrl?: string;
