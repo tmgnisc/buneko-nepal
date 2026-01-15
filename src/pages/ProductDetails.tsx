@@ -3,10 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { api } from '@/lib/api';
 import { useCart } from '@/contexts/CartContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ShoppingBag, ArrowLeft } from 'lucide-react';
+import { ShoppingBag, ArrowLeft, Heart } from 'lucide-react';
 
 interface Product {
   id: number;
@@ -20,9 +21,12 @@ const ProductDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { addToCart } = useCart();
+  const { isAuthenticated } = useAuth();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
+  const [isInWishlist, setIsInWishlist] = useState(false);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -47,6 +51,28 @@ const ProductDetailsPage = () => {
     loadProduct();
   }, [id, navigate]);
 
+  // Check if product is in wishlist (only for authenticated users)
+  useEffect(() => {
+    const checkWishlist = async () => {
+      if (!isAuthenticated || !id) {
+        setIsInWishlist(false);
+        return;
+      }
+      try {
+        const response = await api.getWishlist();
+        if (response.success && response.data) {
+          const wishlistItems = response.data.items || [];
+          const productId = Number(id);
+          setIsInWishlist(wishlistItems.some((item: any) => item.product_id === productId));
+        }
+      } catch (error: any) {
+        console.error('Error checking wishlist:', error);
+        // Don't show error toast, just silently fail
+      }
+    };
+    checkWishlist();
+  }, [isAuthenticated, id]);
+
   const handleAddToCart = () => {
     if (!product) return;
     const numericPrice = Number(product.price);
@@ -61,6 +87,34 @@ const ProductDetailsPage = () => {
       quantity
     );
     toast.success('Added to cart');
+  };
+
+  const handleToggleWishlist = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please login to add items to wishlist');
+      navigate('/login');
+      return;
+    }
+
+    if (!product) return;
+
+    try {
+      setWishlistLoading(true);
+      if (isInWishlist) {
+        await api.removeFromWishlist(product.id);
+        setIsInWishlist(false);
+        toast.success('Removed from wishlist');
+      } else {
+        await api.addToWishlist(product.id);
+        setIsInWishlist(true);
+        toast.success('Added to wishlist');
+      }
+    } catch (error: any) {
+      console.error('Wishlist error:', error);
+      toast.error(error.message || 'Failed to update wishlist');
+    } finally {
+      setWishlistLoading(false);
+    }
   };
 
   const formattedPrice = () => {
@@ -152,6 +206,23 @@ const ProductDetailsPage = () => {
                   >
                     <ShoppingBag className="h-4 w-4 mr-2" />
                     Add to Cart
+                  </Button>
+
+                  <Button
+                    variant={isInWishlist ? 'default' : 'outline'}
+                    size="lg"
+                    className="rounded-xl"
+                    onClick={handleToggleWishlist}
+                    disabled={wishlistLoading}
+                  >
+                    <Heart
+                      className={`h-4 w-4 mr-2 ${isInWishlist ? 'fill-current' : ''}`}
+                    />
+                    {wishlistLoading
+                      ? 'Loading...'
+                      : isInWishlist
+                      ? 'In Wishlist'
+                      : 'Add to Wishlist'}
                   </Button>
                 </div>
               </div>

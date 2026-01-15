@@ -193,15 +193,17 @@ export const createOrder = async (req, res) => {
     const userId = req.user.userId;
     const { items, shipping_address, phone, notes, latitude, longitude, payment_status } = req.body;
 
-    // Calculate total and validate products
+    // Calculate total and validate products (using the same connection for transaction)
     let totalAmount = 0;
     for (const item of items) {
-      const products = await query(
-        'SELECT id, price, stock FROM products WHERE id = ?',
+      const [products] = await connection.execute(
+        'SELECT id, price, stock, name FROM products WHERE id = ?',
         [item.product_id]
       );
 
-      if (!Array.isArray(products) || products.length === 0) {
+      const productsArray = Array.isArray(products) ? products : [];
+
+      if (productsArray.length === 0) {
         await connection.rollback();
         return res.status(404).json({
           success: false,
@@ -209,7 +211,7 @@ export const createOrder = async (req, res) => {
         });
       }
 
-      const product = products[0];
+      const product = productsArray[0];
 
       if (product.stock < item.quantity) {
         await connection.rollback();
@@ -219,12 +221,12 @@ export const createOrder = async (req, res) => {
         });
       }
 
-      const subtotal = product.price * item.quantity;
+      const subtotal = Number(product.price) * item.quantity;
       totalAmount += subtotal;
     }
 
-    // Create order
-    const [orderResult] = await query(
+    // Create order (on the transaction connection)
+    const [orderResult] = await connection.execute(
       `INSERT INTO orders (user_id, total_amount, payment_status, status, shipping_address, phone, latitude, longitude, notes)
        VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
       [
@@ -241,23 +243,24 @@ export const createOrder = async (req, res) => {
 
     const orderId = orderResult.insertId;
 
-    // Create order items and update stock
+    // Create order items and update stock (same connection / transaction)
     for (const item of items) {
-      const products = await query(
+      const [products] = await connection.execute(
         'SELECT price FROM products WHERE id = ?',
         [item.product_id]
       );
-      const product = products[0];
-      const subtotal = product.price * item.quantity;
+      const productsArray = Array.isArray(products) ? products : [];
+      const product = productsArray[0];
+      const subtotal = Number(product.price) * item.quantity;
 
-      await query(
+      await connection.execute(
         `INSERT INTO order_items (order_id, product_id, quantity, price, subtotal)
          VALUES (?, ?, ?, ?, ?)`,
         [orderId, item.product_id, item.quantity, product.price, subtotal]
       );
 
       // Update product stock
-      await query(
+      await connection.execute(
         'UPDATE products SET stock = stock - ? WHERE id = ?',
         [item.quantity, item.product_id]
       );
@@ -265,7 +268,7 @@ export const createOrder = async (req, res) => {
 
     await connection.commit();
 
-    // Get created order with items
+    // Get created order with items (can use pool query here)
     const orders = await query('SELECT * FROM orders WHERE id = ?', [orderId]);
     const orderItems = await query(
       `SELECT 

@@ -54,12 +54,17 @@ const CartPage = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const paymentStatus = params.get('payment');
+    
     if (paymentStatus === 'success') {
       const stored = localStorage.getItem('pending_card_order');
-      if (!stored || items.length === 0) {
+      if (!stored) {
+        console.warn('No pending order data found after Stripe payment success');
+        // Clean URL anyway
+        window.history.replaceState({}, '', window.location.pathname);
         return;
       }
-      const payload = JSON.parse(stored) as {
+
+      let payload: {
         items: Array<{ product_id: number; quantity: number }>;
         shipping_address: string;
         phone: string;
@@ -68,7 +73,17 @@ const CartPage = () => {
         longitude?: number | null;
       };
 
-      // Avoid duplicate order creation
+      try {
+        payload = JSON.parse(stored);
+      } catch (error) {
+        console.error('Error parsing pending order data:', error);
+        localStorage.removeItem('pending_card_order');
+        window.history.replaceState({}, '', window.location.pathname);
+        toast.error('Failed to process order data. Please contact support.');
+        return;
+      }
+
+      // Remove stored data immediately to prevent duplicate order creation
       localStorage.removeItem('pending_card_order');
       // Clean query param from URL
       window.history.replaceState({}, '', window.location.pathname);
@@ -76,15 +91,23 @@ const CartPage = () => {
       const createPaidOrder = async () => {
         try {
           setIsPlacingOrder(true);
-          await api.createOrder({
+          console.log('Creating order after Stripe payment:', payload);
+          const response = await api.createOrder({
             ...payload,
             payment_status: 'paid',
           });
-          toast.success('Order created successfully after card payment.');
-          clearCart();
+          
+          if (response.success) {
+            toast.success('Order placed successfully! Payment received.');
+            clearCart();
+          } else {
+            throw new Error(response.message || 'Failed to create order');
+          }
         } catch (error: any) {
           console.error('Error creating order after payment:', error);
-          toast.error(error.message || 'Failed to save order after payment.');
+          toast.error(error.message || 'Failed to save order after payment. Please contact support.');
+          // Re-store the payload so user can retry if needed
+          localStorage.setItem('pending_card_order', JSON.stringify(payload));
         } finally {
           setIsPlacingOrder(false);
         }
@@ -95,6 +118,8 @@ const CartPage = () => {
       // Clean URL and inform user
       window.history.replaceState({}, '', window.location.pathname);
       toast.error('Payment was cancelled.');
+      // Optionally remove pending order data on cancel
+      localStorage.removeItem('pending_card_order');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

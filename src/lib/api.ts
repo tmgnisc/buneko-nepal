@@ -270,6 +270,29 @@ class ApiClient {
     });
   }
 
+  async getOrders(params?: { page?: number; limit?: number; status?: string }) {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.status) queryParams.append('status', params.status);
+
+    const query = queryParams.toString();
+    return this.request<{ orders: any[] }>(
+      `/orders${query ? `?${query}` : ''}`,
+      { method: 'GET' }
+    );
+  }
+
+  async updateOrderStatus(
+    id: number,
+    status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+  ) {
+    return this.request<{ order: any }>(`/orders/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  }
+
   async getUserOrders() {
     return this.request<{ orders: any[] }>('/orders/my-orders', {
       method: 'GET',

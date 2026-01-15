@@ -77,10 +77,18 @@ export const Navbar = () => {
                   <Button
                     variant="outline"
                     size="icon"
-                    className="h-9 w-9 rounded-full flex items-center justify-center"
+                    className="h-9 w-9 rounded-full flex items-center justify-center overflow-hidden p-0"
                     title="Open dashboard"
                   >
-                    <User className="h-4 w-4" />
+                    {user?.profile_image_url ? (
+                      <img
+                        src={user.profile_image_url}
+                        alt={user.name || 'User'}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="h-4 w-4" />
+                    )}
                   </Button>
                 </Link>
                 <Button variant="outline" size="sm" onClick={logout}>

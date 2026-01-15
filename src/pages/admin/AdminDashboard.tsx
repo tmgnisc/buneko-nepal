@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/lib/api';
+import { toast } from 'sonner';
 import ProductsManagement from './ProductsManagement';
 import CategoriesManagement from './CategoriesManagement';
 import AdminProfile from './AdminProfile';
@@ -114,19 +116,244 @@ const AdminOverview = () => (
 );
 
 
-// Orders Management
-const OrdersManagement = () => (
-  <div className="space-y-6">
-    <h1 className="font-serif text-3xl font-bold text-foreground">
-      Manage Orders
-    </h1>
-    <div className="bg-card rounded-2xl p-6 shadow-soft">
-      <p className="text-muted-foreground text-center py-8">
-        Order management interface coming soon!
-      </p>
+// Orders Management (dynamic)
+const OrdersManagement = () => {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
+
+  const loadOrders = async () => {
+    try {
+      setLoading(true);
+      const res = await api.getOrders({
+        page: 1,
+        limit: 50,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+      });
+      if (res.success && res.data) {
+        setOrders(res.data.orders || []);
+      } else {
+        setOrders([]);
+      }
+    } catch (error: any) {
+      console.error('Error loading orders:', error);
+      toast.error(error.message || 'Failed to load orders');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
+
+  const handleStatusChange = async (
+    orderId: number,
+    newStatus: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+  ) => {
+    try {
+      setUpdatingId(orderId);
+      const res = await api.updateOrderStatus(orderId, newStatus);
+      if (res.success) {
+        toast.success('Order status updated');
+        setOrders((prev) =>
+          prev.map((order) =>
+            order.id === orderId ? { ...order, status: newStatus } : order
+          )
+        );
+      }
+    } catch (error: any) {
+      console.error('Error updating order status:', error);
+      toast.error(error.message || 'Failed to update order status');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const formatAmount = (value: any) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? `NPR ${n.toFixed(2)}` : `NPR ${value}`;
+  };
+
+  const formatDate = (value: string) =>
+    value ? new Date(value).toLocaleString() : '';
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="font-serif text-3xl font-bold text-foreground">
+            Manage Orders
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            View and manage all customer orders.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Filter by status:</span>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="border border-border bg-background text-sm rounded-xl px-3 py-1.5"
+          >
+            <option value="all">All</option>
+            <option value="pending">Pending</option>
+            <option value="processing">Processing</option>
+            <option value="shipped">Shipped</option>
+            <option value="delivered">Delivered</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="bg-card rounded-2xl p-6 shadow-soft">
+        {loading ? (
+          <p className="text-muted-foreground text-center py-8">
+            Loading orders...
+          </p>
+        ) : orders.length === 0 ? (
+          <p className="text-muted-foreground text-center py-8">
+            No orders found.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground border-b border-border">
+                  <th className="py-2 pr-4">Order ID</th>
+                  <th className="py-2 pr-4">Customer</th>
+                  <th className="py-2 pr-4">Contact</th>
+                  <th className="py-2 pr-4">Total</th>
+                  <th className="py-2 pr-4">Payment</th>
+                  <th className="py-2 pr-4">Status</th>
+                  <th className="py-2 pr-4">Created</th>
+                  <th className="py-2 pr-4">Items</th>
+                  <th className="py-2 pr-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => (
+                  <tr
+                    key={order.id}
+                    className="border-b border-border last:border-0 align-top"
+                  >
+                    <td className="py-3 pr-4 font-medium text-foreground">
+                      #{order.id}
+                    </td>
+                    <td className="py-3 pr-4">
+                      <div className="flex flex-col">
+                        <span className="font-medium">
+                          {order.user_name || 'Unknown'}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {order.user_email}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <div className="flex flex-col">
+                        <span className="text-xs text-muted-foreground">
+                          {order.phone}
+                        </span>
+                        <span className="text-xs text-muted-foreground line-clamp-2">
+                          {order.shipping_address}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3 pr-4 whitespace-nowrap">
+                      <span className="font-semibold text-foreground">
+                        {formatAmount(order.total_amount)}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          order.payment_status === 'paid'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : order.payment_status === 'failed'
+                            ? 'bg-destructive/10 text-destructive'
+                            : 'bg-amber-100 text-amber-700'
+                        }`}
+                      >
+                        {order.payment_status || 'pending'}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
+                          order.status === 'delivered'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : order.status === 'cancelled'
+                            ? 'bg-destructive/10 text-destructive'
+                            : order.status === 'processing'
+                            ? 'bg-sky-100 text-sky-700'
+                            : order.status === 'shipped'
+                            ? 'bg-indigo-100 text-indigo-700'
+                            : 'bg-amber-100 text-amber-700'
+                        }`}
+                      >
+                        {order.status}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-4 whitespace-nowrap text-xs text-muted-foreground">
+                      {formatDate(order.created_at)}
+                    </td>
+                    <td className="py-3 pr-4 text-xs text-muted-foreground">
+                      {order.items && order.items.length > 0 ? (
+                        <ul className="space-y-1 max-w-[220px]">
+                          {order.items.map((item: any) => (
+                            <li key={item.id} className="flex justify-between gap-2">
+                              <span className="truncate">
+                                {item.product_name || `Product #${item.product_id}`}
+                              </span>
+                              <span className="shrink-0">
+                                × {item.quantity}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          No items
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 pr-0 text-right">
+                      <select
+                        value={order.status}
+                        disabled={updatingId === order.id}
+                        onChange={(e) =>
+                          handleStatusChange(
+                            order.id,
+                            e.target.value as
+                              | 'pending'
+                              | 'processing'
+                              | 'shipped'
+                              | 'delivered'
+                              | 'cancelled'
+                          )
+                        }
+                        className="border border-border bg-background text-xs rounded-xl px-2 py-1"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="processing">Processing</option>
+                        <option value="shipped">Shipped</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 
 const AdminDashboard = () => {
@@ -222,8 +449,16 @@ const AdminDashboard = () => {
               <span className="text-sm text-muted-foreground">
                 {user?.role === 'superadmin' ? 'Super Admin' : 'Admin'}: {user?.name || 'Admin'}
               </span>
-              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-                <User className="h-5 w-5 text-primary-foreground" />
+              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center overflow-hidden">
+                {user?.profile_image_url ? (
+                  <img
+                    src={user.profile_image_url}
+                    alt={user.name || 'Admin'}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <User className="h-5 w-5 text-primary-foreground" />
+                )}
               </div>
             </div>
           </div>
