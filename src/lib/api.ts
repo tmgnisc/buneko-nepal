@@ -156,6 +156,11 @@ class ApiClient {
     const data = await response.json();
 
     if (!response.ok) {
+      // Handle validation errors
+      if (data.errors && Array.isArray(data.errors)) {
+        const errorMessages = data.errors.map((err: any) => err.msg || err.message).join(', ');
+        throw new Error(errorMessages || data.message || 'Validation failed');
+      }
       throw new Error(data.message || 'Failed to create product');
     }
 
@@ -200,6 +205,11 @@ class ApiClient {
     const data = await response.json();
 
     if (!response.ok) {
+      // Handle validation errors
+      if (data.errors && Array.isArray(data.errors)) {
+        const errorMessages = data.errors.map((err: any) => err.msg || err.message).join(', ');
+        throw new Error(errorMessages || data.message || 'Validation failed');
+      }
       throw new Error(data.message || 'Failed to update product');
     }
 
@@ -235,6 +245,40 @@ class ApiClient {
   async getCategories() {
     return this.request<{ categories: any[] }>('/categories', {
       method: 'GET',
+    });
+  }
+
+  async getCategoryById(id: number) {
+    return this.request<{ category: any }>(`/categories/${id}`, {
+      method: 'GET',
+    });
+  }
+
+  async createCategory(categoryData: {
+    name: string;
+    description?: string;
+    image_url?: string;
+  }) {
+    return this.request<{ category: any }>('/categories', {
+      method: 'POST',
+      body: JSON.stringify(categoryData),
+    });
+  }
+
+  async updateCategory(id: number, categoryData: {
+    name?: string;
+    description?: string;
+    image_url?: string;
+  }) {
+    return this.request<{ category: any }>(`/categories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(categoryData),
+    });
+  }
+
+  async deleteCategory(id: number) {
+    return this.request(`/categories/${id}`, {
+      method: 'DELETE',
     });
   }
 }

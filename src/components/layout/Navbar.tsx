@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, ShoppingBag, User, Flower2 } from 'lucide-react';
+import { Menu, X, ShoppingBag, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -23,7 +23,7 @@ export const Navbar = () => {
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <Flower2 className="h-8 w-8 text-primary" />
+            <img src="/logo.jpg" alt="Buneko Nepal" className="h-8 w-8 object-contain" />
             <span className="font-serif text-2xl font-semibold text-foreground">
               Buneko Nepal
             </span>

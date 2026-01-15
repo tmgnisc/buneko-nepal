@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Flower2, Mail, Phone, MapPin, Facebook, Instagram, Twitter } from 'lucide-react';
+import { Mail, Phone, MapPin, Facebook, Instagram, Twitter } from 'lucide-react';
 
 export const Footer = () => {
   return (
@@ -9,7 +9,7 @@ export const Footer = () => {
           {/* Brand */}
           <div className="space-y-4">
             <Link to="/" className="flex items-center gap-2">
-              <Flower2 className="h-8 w-8 text-primary" />
+              <img src="/logo.jpg" alt="Buneko Nepal" className="h-8 w-8 object-contain" />
               <span className="font-serif text-2xl font-semibold text-foreground">
                 Buneko Nepal
               </span>

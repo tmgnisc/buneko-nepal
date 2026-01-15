@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
-import { Flower2, Mail, Lock, Eye, EyeOff, User } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -73,7 +73,7 @@ const Signup = () => {
           className="text-center max-w-md"
         >
           <div className="w-24 h-24 mx-auto mb-8 rounded-full bg-primary-foreground/20 flex items-center justify-center">
-            <Flower2 className="h-12 w-12 text-primary-foreground" />
+            <img src="/logo.jpg" alt="Buneko Nepal" className="h-12 w-12 object-contain rounded-full" />
           </div>
           <h2 className="font-serif text-3xl font-bold text-primary-foreground mb-4">
             Join Our Community
@@ -95,7 +95,7 @@ const Signup = () => {
         >
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 mb-8">
-            <Flower2 className="h-8 w-8 text-primary" />
+            <img src="/logo.jpg" alt="Buneko Nepal" className="h-8 w-8 object-contain" />
             <span className="font-serif text-2xl font-semibold text-foreground">
               Buneko Nepal
             </span>

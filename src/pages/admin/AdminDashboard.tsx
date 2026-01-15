@@ -10,16 +10,18 @@ import {
   User,
   LogOut,
   Menu,
-  Flower2,
   Plus,
   TrendingUp,
+  Folder,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import ProductsManagement from './ProductsManagement';
+import CategoriesManagement from './CategoriesManagement';
 
 const sidebarLinks = [
   { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+  { name: 'Categories', href: '/admin/categories', icon: Folder },
   { name: 'Products', href: '/admin/products', icon: Package },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
   { name: 'Customers', href: '/admin/customers', icon: Users },
@@ -188,7 +190,7 @@ const AdminDashboard = () => {
           {/* Logo */}
           <div className="p-6 border-b border-border">
             <Link to="/" className="flex items-center gap-2">
-              <Flower2 className="h-8 w-8 text-primary" />
+              <img src="/logo.jpg" alt="Buneko Nepal" className="h-8 w-8 object-contain" />
               <div>
                 <span className="font-serif text-xl font-semibold text-foreground block">
                   Buneko Nepal
@@ -275,6 +277,7 @@ const AdminDashboard = () => {
           >
             <Routes>
               <Route index element={<AdminOverview />} />
+              <Route path="categories" element={<CategoriesManagement />} />
               <Route path="products" element={<ProductsManagement />} />
               <Route path="orders" element={<OrdersManagement />} />
               <Route path="customers" element={<CustomersManagement />} />

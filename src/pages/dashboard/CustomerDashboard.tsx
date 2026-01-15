@@ -10,7 +10,6 @@ import {
   LogOut,
   Menu,
   X,
-  Flower2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -147,7 +146,7 @@ const CustomerDashboard = () => {
           {/* Logo */}
           <div className="p-6 border-b border-border">
             <Link to="/" className="flex items-center gap-2">
-              <Flower2 className="h-8 w-8 text-primary" />
+              <img src="/logo.jpg" alt="Buneko Nepal" className="h-8 w-8 object-contain" />
               <span className="font-serif text-xl font-semibold text-foreground">
                 Buneko Nepal
               </span>
