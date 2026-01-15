@@ -32,6 +32,7 @@ const productValidation = [
     .isFloat({ min: 0 })
     .withMessage('Price must be a positive number'),
   body('category_id')
+    .optional()
     .isInt({ min: 1 })
     .withMessage('Valid category ID is required'),
   body('stock')

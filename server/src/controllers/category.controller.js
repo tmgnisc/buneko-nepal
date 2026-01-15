@@ -3,7 +3,7 @@ import { query } from '../config/database.js';
 // Get all categories
 export const getCategories = async (req, res) => {
   try {
-    const [categories] = await query(
+    const categories = await query(
       `SELECT 
         c.id,
         c.name,
@@ -20,7 +20,7 @@ export const getCategories = async (req, res) => {
     res.json({
       success: true,
       data: {
-        categories,
+        categories: Array.isArray(categories) ? categories : [],
       },
     });
   } catch (error) {

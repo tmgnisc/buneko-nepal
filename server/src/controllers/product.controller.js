@@ -39,7 +39,7 @@ export const getProducts = async (req, res) => {
     sql += ' ORDER BY p.created_at DESC LIMIT ? OFFSET ?';
     params.push(parseInt(limit), parseInt(offset));
 
-    const [products] = await query(sql, params);
+    const products = await query(sql, params);
 
     // Get total count
     let countSql = 'SELECT COUNT(*) as total FROM products WHERE 1=1';
@@ -56,8 +56,10 @@ export const getProducts = async (req, res) => {
       countParams.push(searchTerm, searchTerm);
     }
 
-    const [countResult] = await query(countSql, countParams);
-    const total = countResult[0].total;
+    const countResult = await query(countSql, countParams);
+    const total = Array.isArray(countResult) && countResult.length > 0 
+      ? countResult[0].total 
+      : 0;
 
     res.json({
       success: true,

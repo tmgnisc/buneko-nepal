@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import ProductsManagement from './ProductsManagement';
 
 const sidebarLinks = [
   { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
@@ -107,25 +108,6 @@ const AdminOverview = () => (
   </div>
 );
 
-// Products Management
-const ProductsManagement = () => (
-  <div className="space-y-6">
-    <div className="flex items-center justify-between">
-      <h1 className="font-serif text-3xl font-bold text-foreground">
-        Manage Products
-      </h1>
-      <Button>
-        <Plus className="h-4 w-4 mr-2" />
-        Add Product
-      </Button>
-    </div>
-    <div className="bg-card rounded-2xl p-6 shadow-soft">
-      <p className="text-muted-foreground text-center py-8">
-        Product management interface coming soon!
-      </p>
-    </div>
-  </div>
-);
 
 // Orders Management
 const OrdersManagement = () => (
