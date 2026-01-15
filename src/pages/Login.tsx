@@ -1,0 +1,180 @@
+import { motion } from 'framer-motion';
+import { Link, useNavigate } from 'react-router-dom';
+import { Flower2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+
+const loginSchema = z.object({
+  email: z.string().email('Please enter a valid email'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  rememberMe: z.boolean().optional(),
+});
+
+type LoginFormData = z.infer<typeof loginSchema>;
+
+const Login = () => {
+  const [showPassword, setShowPassword] = useState(false);
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+  });
+
+  const onSubmit = async (data: LoginFormData) => {
+    try {
+      await login(data.email, data.password);
+      toast.success('Welcome back!');
+      
+      // Redirect based on email (simulated role check)
+      if (data.email.includes('admin')) {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      toast.error('Invalid credentials. Please try again.');
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex">
+      {/* Left Side - Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="w-full max-w-md"
+        >
+          {/* Logo */}
+          <Link to="/" className="flex items-center gap-2 mb-8">
+            <Flower2 className="h-8 w-8 text-primary" />
+            <span className="font-serif text-2xl font-semibold text-foreground">
+              Buneko Nepal
+            </span>
+          </Link>
+
+          <h1 className="font-serif text-3xl font-bold text-foreground mb-2">
+            Welcome Back
+          </h1>
+          <p className="text-muted-foreground mb-8">
+            Sign in to your account to continue
+          </p>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <div>
+              <Label htmlFor="email">Email Address</Label>
+              <div className="relative mt-2">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="john@example.com"
+                  className="pl-10 rounded-xl"
+                  {...register('email')}
+                />
+              </div>
+              {errors.email && (
+                <p className="text-destructive text-sm mt-1">
+                  {errors.email.message}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="password">Password</Label>
+              <div className="relative mt-2">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  className="pl-10 pr-10 rounded-xl"
+                  {...register('password')}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+              {errors.password && (
+                <p className="text-destructive text-sm mt-1">
+                  {errors.password.message}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Checkbox id="rememberMe" {...register('rememberMe')} />
+                <Label htmlFor="rememberMe" className="text-sm cursor-pointer">
+                  Remember me
+                </Label>
+              </div>
+              <Link
+                to="/forgot-password"
+                className="text-sm text-primary hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </div>
+
+            <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? 'Signing in...' : 'Sign In'}
+            </Button>
+          </form>
+
+          <p className="text-center mt-8 text-muted-foreground">
+            Don't have an account?{' '}
+            <Link to="/signup" className="text-primary font-medium hover:underline">
+              Sign up
+            </Link>
+          </p>
+        </motion.div>
+      </div>
+
+      {/* Right Side - Decorative */}
+      <div className="hidden lg:flex w-1/2 bg-primary items-center justify-center p-12">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="text-center max-w-md"
+        >
+          <div className="w-24 h-24 mx-auto mb-8 rounded-full bg-primary-foreground/20 flex items-center justify-center">
+            <Flower2 className="h-12 w-12 text-primary-foreground" />
+          </div>
+          <h2 className="font-serif text-3xl font-bold text-primary-foreground mb-4">
+            Handcrafted with Love
+          </h2>
+          <p className="text-primary-foreground/80 leading-relaxed">
+            Experience the beauty of traditional Nepali craftsmanship with our 
+            unique collection of handmade flowers, created by skilled local artisans.
+          </p>
+        </motion.div>
+      </div>
+    </div>
+  );
+};
+
+export default Login;
