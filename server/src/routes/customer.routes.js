@@ -5,7 +5,7 @@ import { authenticate } from '../middleware/auth.middleware.js';
 const router = express.Router();
 
 // Get customer dashboard statistics
-router.get('/dashboard/stats', authenticate, getCustomerDashboardStats);
+router.get('/customer/dashboard/stats', authenticate, getCustomerDashboardStats);
 
 export default router;
 
