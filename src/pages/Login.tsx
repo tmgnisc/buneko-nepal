@@ -35,16 +35,23 @@ const Login = () => {
 
   const onSubmit = async (data: LoginFormData) => {
     try {
+      console.log('Attempting login with:', data.email);
       const userData = await login(data.email, data.password);
-      toast.success('Welcome back!');
+      console.log('Login successful, user data:', userData);
       
-      // Redirect based on user role
-      if (userData?.role === 'superadmin' || userData?.role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/dashboard');
-      }
+      toast.success(`Welcome back, ${userData.name}!`);
+      
+      // Small delay to ensure state is updated
+      setTimeout(() => {
+        // Redirect based on user role
+        if (userData?.role === 'superadmin' || userData?.role === 'admin') {
+          navigate('/admin', { replace: true });
+        } else {
+          navigate('/dashboard', { replace: true });
+        }
+      }, 100);
     } catch (error: any) {
+      console.error('Login error:', error);
       toast.error(error.message || 'Invalid credentials. Please try again.');
     }
   };
@@ -74,7 +81,13 @@ const Login = () => {
             Sign in to your account to continue
           </p>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSubmit(onSubmit)(e);
+            }} 
+            className="space-y-6"
+          >
             <div>
               <Label htmlFor="email">Email Address</Label>
               <div className="relative mt-2">
@@ -139,7 +152,12 @@ const Login = () => {
               </Link>
             </div>
 
-            <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
+            <Button 
+              type="submit" 
+              size="lg" 
+              className="w-full" 
+              disabled={isSubmitting}
+            >
               {isSubmitting ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { api } from '@/lib/api';
 
 interface User {
@@ -12,7 +12,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -23,6 +23,36 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const logout = async () => {
+    try {
+      await api.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Clear storage and state regardless of API call result
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setUser(null);
+    }
+  };
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const response = await api.getCurrentUser();
+      if (response.success && response.data) {
+        const userData = response.data.user;
+        localStorage.setItem('user', JSON.stringify(userData));
+        setUser(userData);
+      }
+    } catch (error) {
+      console.error('Error refreshing user:', error);
+      // If refresh fails, clear storage
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setUser(null);
+    }
+  }, []);
 
   // Load user from localStorage and verify token on mount
   useEffect(() => {
@@ -35,11 +65,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const userData = JSON.parse(storedUser);
           setUser(userData);
           
-          // Verify token is still valid
+          // Verify token is still valid in the background
           try {
-            await api.getCurrentUser();
+            const response = await api.getCurrentUser();
+            if (response.success && response.data) {
+              // Update user data if it changed
+              const updatedUser = response.data.user;
+              localStorage.setItem('user', JSON.stringify(updatedUser));
+              setUser(updatedUser);
+            }
           } catch (error) {
             // Token invalid, clear storage
+            console.warn('Token validation failed, clearing session');
             localStorage.removeItem('user');
             localStorage.removeItem('token');
             setUser(null);
@@ -48,6 +85,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           console.error('Error loading user:', error);
           localStorage.removeItem('user');
           localStorage.removeItem('token');
+          setUser(null);
         }
       }
       setIsLoading(false);
@@ -55,6 +93,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     loadUser();
   }, []);
+
+  // Session refresh - refresh user data periodically
+  useEffect(() => {
+    if (!user) return;
+
+    // Refresh user data every 5 minutes
+    const refreshInterval = setInterval(async () => {
+      try {
+        await refreshUser();
+      } catch (error) {
+        console.error('Session refresh failed:', error);
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => {
+      clearInterval(refreshInterval);
+    };
+  }, [user, refreshUser]);
 
   const login = async (email: string, password: string) => {
     try {
@@ -99,33 +155,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const logout = async () => {
-    try {
-      await api.logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      // Clear storage and state regardless of API call result
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      setUser(null);
-    }
-  };
-
-  const refreshUser = async () => {
-    try {
-      const response = await api.getCurrentUser();
-      if (response.success && response.data) {
-        const userData = response.data.user;
-        localStorage.setItem('user', JSON.stringify(userData));
-        setUser(userData);
-      }
-    } catch (error) {
-      console.error('Error refreshing user:', error);
-      // If refresh fails, logout user
-      logout();
-    }
-  };
 
   return (
     <AuthContext.Provider

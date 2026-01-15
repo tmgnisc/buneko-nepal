@@ -32,22 +32,37 @@ class ApiClient {
         headers,
       });
 
-      const data = await response.json();
+      // Handle non-JSON responses
+      let data;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(text || 'Request failed');
+      }
 
       if (!response.ok) {
         // If unauthorized, clear token and redirect to login
         if (response.status === 401) {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
-          window.location.href = '/login';
+          // Only redirect if not already on login page
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
         }
-        throw new Error(data.message || 'Request failed');
+        throw new Error(data.message || data.error || 'Request failed');
       }
 
       return data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('API request error:', error);
-      throw error;
+      // Re-throw with better error message
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error(error.message || 'Network error. Please check your connection.');
     }
   }
 

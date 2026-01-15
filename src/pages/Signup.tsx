@@ -41,10 +41,16 @@ const Signup = () => {
 
   const onSubmit = async (data: SignupFormData) => {
     try {
+      console.log('Attempting signup with:', data.email);
       await signup(data.name, data.email, data.password);
       toast.success('Account created successfully!');
-      navigate('/dashboard');
+      
+      // Small delay to ensure state is updated
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 100);
     } catch (error: any) {
+      console.error('Signup error:', error);
       toast.error(error.message || 'Something went wrong. Please try again.');
     }
   };
@@ -95,7 +101,13 @@ const Signup = () => {
             Join us and start shopping for beautiful handmade flowers
           </p>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSubmit(onSubmit)(e);
+            }} 
+            className="space-y-6"
+          >
             <div>
               <Label htmlFor="name">Full Name</Label>
               <div className="relative mt-2">
@@ -193,7 +205,12 @@ const Signup = () => {
               )}
             </div>
 
-            <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
+            <Button 
+              type="submit" 
+              size="lg" 
+              className="w-full" 
+              disabled={isSubmitting}
+            >
               {isSubmitting ? 'Creating account...' : 'Create Account'}
             </Button>
           </form>
